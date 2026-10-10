@@ -1,0 +1,12 @@
+{
+  "name": "מזגן",
+  "short_name": "מזגן",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/kor/",
+  "scope": "/kor/",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "icons": [{ "src": "/kor/apple-touch-icon.png?v=2", "sizes": "180x180", "type": "image/png", "purpose": "any" }]
+}
