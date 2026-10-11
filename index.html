@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="2.1">
+<meta name="app-version" content="2.2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -217,14 +217,14 @@ html,body{background:#000}
 body{font-family:var(--f-body);letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
   background:radial-gradient(60% 45% at 50% 22%,var(--accent-soft),transparent 70%),radial-gradient(50% 40% at 85% 85%,rgba(120,120,255,.10),transparent 70%),#000;
-  filter:saturate(1.4);transition:background .6s}
+  transition:background .6s}
 .app{gap:20px;padding-top:6px}
 .top h1{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
 .sub{font-size:15px;color:var(--muted)}
 .glassy,.pick button,.pill,.menu-btn,.step,.seg,.tog,.prof,.more,.bb,.turbo,.air svg,.chip,.item,.btn,.timer-line,.choice,.field input,.field select,.stat-big>div,.hint,.icon-btn{
   background:var(--glass)!important;border:.5px solid var(--glass-edge)!important;
-  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
-  box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 -1px 0 rgba(255,255,255,.04),0 8px 30px rgba(0,0,0,.35)}
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  box-shadow:inset 0 1px 0 var(--glass-hi)}
 .pill{padding:7px 12px;font-size:13px;color:var(--fg)}
 .menu-btn{width:40px;height:40px}
 .step{width:56px;height:56px;font-size:28px;font-weight:300}
@@ -232,12 +232,12 @@ body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none
 .temp sup{font-size:28px;font-weight:300}
 .mode-lbl{font-weight:600;font-size:15px}
 .track{stroke:rgba(255,255,255,.1)}
-.val{filter:drop-shadow(0 0 10px var(--accent))}
+.val{filter:none}
 .knob{fill:#fff;stroke:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
 .tick{stroke:rgba(255,255,255,.5)}
 .glow{inset:0;background:radial-gradient(circle,var(--accent-soft),transparent 62%)}
-.power{border-radius:999px;padding:18px;font-size:17px;font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 10px 30px color-mix(in srgb,var(--accent) 40%,transparent)}
-.app.is-off .power{background:var(--glass-2)!important;border:.5px solid var(--glass-edge)!important;color:var(--fg);box-shadow:inset 0 1px 0 var(--glass-hi);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+.power{border-radius:999px;padding:18px;font-size:17px;font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+.app.is-off .power{background:var(--glass-2)!important;border:.5px solid var(--glass-edge)!important;color:var(--fg);box-shadow:inset 0 1px 0 var(--glass-hi)}
 .turbo{border-radius:999px;width:78px}
 .turbo[aria-pressed="true"],.chip[aria-pressed="true"],.prof[aria-pressed="true"],.tog[aria-pressed="true"],.pick button[aria-pressed="true"],.air[aria-pressed="true"] svg{
   background:color-mix(in srgb,var(--accent) 22%,transparent)!important;border-color:color-mix(in srgb,var(--accent) 60%,transparent)!important}
@@ -251,12 +251,12 @@ body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none
 /* floating glass tab bar */
 .bottom-bar{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:8px;border-radius:30px;
   background:rgba(30,30,32,.55);border:.5px solid var(--glass-edge);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
-  box-shadow:inset 0 1px 0 var(--glass-hi),0 16px 40px rgba(0,0,0,.5);max-width:436px}
+  box-shadow:inset 0 1px 0 var(--glass-hi);max-width:436px;transform:translateZ(0)}
 .bb{border-radius:22px;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none;-webkit-backdrop-filter:none}
 .bb:active{background:rgba(255,255,255,.08)!important}
 .bb-ic{border-radius:12px}
 /* sheets */
-.scrim{background:rgba(0,0,0,.35);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.scrim{background:rgba(0,0,0,.5);backdrop-filter:none;-webkit-backdrop-filter:none}
 .sheet{margin:0 8px 8px;width:calc(100% - 16px);border-radius:36px!important;border:.5px solid var(--glass-edge)!important;
   background:rgba(28,28,30,.72)!important;backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
   box-shadow:inset 0 1px 0 var(--glass-hi),0 -10px 50px rgba(0,0,0,.5);padding-top:26px;position:relative;animation:sheetIn .32s cubic-bezier(.2,.9,.25,1.05)}
