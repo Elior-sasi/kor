@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.9">
+<meta name="app-version" content="4.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -1066,7 +1066,10 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
     const app=document.getElementById('app');app.style.setProperty('gap','12px','important');
     const left=bar.getBoundingClientRect().top-20-sum.getBoundingClientRect().bottom;
     if(left>4)app.style.setProperty('gap',Math.min(30,12+left/5)+'px','important');
+    app.scrollTop=more.open?app.scrollTop:0;
+    app.style.setProperty('overflow-y',(more.open||app.scrollHeight>app.clientHeight+2)?'auto':'hidden','important');
   };
+  more.addEventListener('toggle',()=>setTimeout(fit,30));
   addEventListener('load',fit);addEventListener('resize',()=>setTimeout(fit,50));setTimeout(fit,60);setTimeout(fit,600);
   window.__fitDial=fit;
 })();
