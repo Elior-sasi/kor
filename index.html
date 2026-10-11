@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="4.1">
+<meta name="app-version" content="4.2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -857,7 +857,7 @@ function openMenu(){
   sheet(`<h3>תפריט</h3><div class="menu-list">
     ${linked&&CAP?row('timer',MI.timer,'טיימר',timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל')+row('sched',MI.sched,'תזמונים',EXTRA.sched)+row('siri',MI.siri,'Siri ומיקום','קיצורי דרך')+row('stats',MI.stats,'סטטיסטיקה',EXTRA.stats):''}
     ${row('conn',MI.conn,'החיבור',linked?'מחובר':'לא מחובר')}
-  </div>`,(el,close)=>{el.querySelector('.menu-list').onclick=e=>{const b=e.target.closest('[data-go]');if(!b)return;buzz();
+  </div><p style="text-align:center;font-size:12px;margin-top:4px">Breeze ${(document.querySelector('meta[name="app-version"]')||{}).content||''}</p>`,(el,close)=>{el.querySelector('.menu-list').onclick=e=>{const b=e.target.closest('[data-go]');if(!b)return;buzz();
     ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
 }
 $('menuBtn').onclick=openMenu;
