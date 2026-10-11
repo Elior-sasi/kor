@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="2.4">
+<meta name="app-version" content="2.5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -275,13 +275,54 @@ body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none
 button{transition:transform .15s cubic-bezier(.2,.9,.25,1.2),background .2s}
 button:active{transform:scale(.96)}
 @media (prefers-reduced-motion:reduce){.sheet,.toast{animation:none}}
+
+/* ===== polish 2.5 ===== */
+@property --accent{syntax:"<color>";inherits:true;initial-value:#5ec8ff}
+:root{transition:--accent .6s ease}
+.app{gap:16px}
+.top{align-items:center}
+.top h1{font-size:28px}
+.pill.only-dot{padding:0;width:40px;height:40px;justify-content:center}
+.pill.only-dot #connTxt{display:none}
+.pill.only-dot .dot{width:10px;height:10px;box-shadow:0 0 8px var(--ok)}
+.hero{margin-bottom:-26px}
+.tick{opacity:.35}
+.app.is-off .temp{color:rgba(255,255,255,.28)!important}
+.app.is-off .mode-lbl{color:rgba(255,255,255,.4)!important}
+.app.is-off .val{opacity:.25}
+.app.is-off .knob{fill:rgba(255,255,255,.55)}
+.profiles{display:grid!important;grid-template-columns:repeat(4,1fr);gap:8px;overflow:visible}
+.prof{flex-direction:column;align-items:center;gap:6px!important;padding:12px 4px!important;min-width:0!important;text-align:center}
+.prof svg{width:22px;height:22px;color:var(--muted)}
+.prof b{font-size:12.5px!important;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.prof[aria-pressed="true"] svg{color:var(--accent)}
+/* iOS settings-style list */
+#toggles{display:flex!important;flex-direction:column;gap:0;border-radius:20px;overflow:hidden;background:var(--glass);border:.5px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi)}
+#toggles .tog{flex-direction:row!important;align-items:center;gap:12px;padding:13px 14px!important;border-radius:0!important;background:transparent!important;border:0!important;box-shadow:none!important;border-bottom:.5px solid var(--line)!important;width:100%}
+#toggles .tog:last-child{border-bottom:0!important}
+#toggles .tog:active{transform:none;background:rgba(255,255,255,.06)!important}
+#toggles .tog svg{width:22px;height:22px;padding:5px;border-radius:8px;background:rgba(255,255,255,.08);color:var(--fg);box-sizing:content-box}
+#toggles .tog .t{flex:1;font-size:15.5px;font-weight:400}
+#toggles .tog .s{display:none}
+#toggles .tog::after{content:"";width:50px;height:30px;border-radius:999px;background:rgba(120,120,128,.32);flex:0 0 auto;
+  background-image:radial-gradient(circle at 15px 15px,#fff 12.5px,transparent 13px);transition:background-color .2s,background-position .2s;background-repeat:no-repeat;background-position:20px 0}
+#toggles .tog[aria-pressed="true"]::after{background-color:#34c759;background-position:0 0}
+#toggles .tog[aria-pressed="true"] svg{background:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--accent)}
+#toggles .tog[data-t="timer"]::after{display:none}
+#toggles .tog[data-t="timer"] .s{display:block;font-size:14px;color:var(--muted)}
+.more-body{gap:16px}
+/* breathing glow when running */
+@keyframes breathe{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.app:not(.is-off) .glow{animation:breathe 4.5s ease-in-out infinite}
+.app.is-off .glow{opacity:.2}
+.val,.knob,.mode-lbl,.bb-ic,.power{transition:stroke .6s,fill .6s,color .6s,background-color .6s,opacity .4s}
+@media (prefers-reduced-motion:reduce){.app .glow{animation:none}:root{transition:none}}
 </style>
 </head><body>
 <div class="app" id="app">
   <header class="top">
     <div>
       <h1 id="devName">מזגן</h1>
-      <div class="sub" id="subline">Sensor CSD</div>
     </div>
     <div class="top-r">
       <button class="pill" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">לא מחובר</span></button>
@@ -394,10 +435,10 @@ const EXTRA_HE={
   sabbath:['מצב שבת','<path d="M12 3l2.5 4.5H19l-2.5 4.5L19 16.5h-4.5L12 21l-2.5-4.5H5l2.5-4.5L5 7.5h4.5Z"/>']
 };
 const PROFILES=[
-  {n:'שינה',d:'26° · נמוך · כיבוי בעוד 3 ש׳',s:{power:true,mode:'cool',temp:26,fan:'low',turbo:false,eco:true,display:false},timer:3},
-  {n:'חוזר הביתה',d:'23° · אוטו · טורבו',s:{power:true,mode:'cool',temp:23,fan:'auto',turbo:true,eco:false}},
-  {n:'חורף',d:'23° חימום · בינוני',s:{power:true,mode:'heat',temp:23,fan:'mid',turbo:false}},
-  {n:'לחות',d:'ייבוש · 25°',s:{power:true,mode:'dry',temp:25,fan:'auto'}}
+  {n:'שינה',ic:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',d:'26° · נמוך · כיבוי בעוד 3 ש׳',s:{power:true,mode:'cool',temp:26,fan:'low',turbo:false,eco:true,display:false},timer:3},
+  {n:'חוזר הביתה',ic:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',d:'23° · אוטו · טורבו',s:{power:true,mode:'cool',temp:23,fan:'auto',turbo:true,eco:false}},
+  {n:'חורף',ic:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',d:'23° חימום · בינוני',s:{power:true,mode:'heat',temp:23,fan:'mid',turbo:false}},
+  {n:'לחות',ic:'<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>',d:'ייבוש · 25°',s:{power:true,mode:'dry',temp:25,fan:'auto'}}
 ];
 
 /* ---------- state ---------- */
@@ -542,7 +583,7 @@ const tmin=()=>CAP&&CAP.temp?CAP.temp.min:16, tmax=()=>CAP&&CAP.temp?CAP.temp.ma
 const pt=(deg,r=R)=>{const a=deg*Math.PI/180;return[C+r*Math.cos(a),C+r*Math.sin(a)]};
 const arc=(a1,a2)=>{const[x1,y1]=pt(a1),[x2,y2]=pt(a2);return`M${x1} ${y1}A${R} ${R} 0 ${a2-a1>180?1:0} 1 ${x2} ${y2}`};
 $('track').setAttribute('d',arc(A0,A0+SPAN));
-function drawTicks(){const n=Math.round((tmax()-tmin())/tstep());$('ticks').innerHTML=Array.from({length:n+1},(_,i)=>{const d=A0+SPAN*i/n,[x1,y1]=pt(d,R-20),[x2,y2]=pt(d,R-(i%2?24:28));return`<line class="tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`}).join('')}
+function drawTicks(){const n=Math.round((tmax()-tmin())/tstep());$('ticks').innerHTML=Array.from({length:n+1},(_,i)=>{if(i%2)return'';const d=A0+SPAN*i/n,[x1,y1]=pt(d,R-20),[x2,y2]=pt(d,R-(i%2?24:28));return`<line class="tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`}).join('')}
 function tempFromPointer(e){const r=$('dial').getBoundingClientRect();const x=(e.clientX-r.left)/r.width*300,y=(e.clientY-r.top)/r.height*300;
   let a=(Math.atan2(y-C,x-C)*180/Math.PI-A0+720)%360;if(a>SPAN)a=a>SPAN+45?0:SPAN;
   const st=tstep();return Math.round((tmin()+(a/SPAN)*(tmax()-tmin()))/st)*st}
@@ -584,7 +625,7 @@ $('toggles').onclick=e=>{const b=e.target.closest('.tog');if(!b)return;buzz();
   if(b.dataset.x){const k='x_'+b.dataset.x;return send({[k]:!S[k]},true)}
   const k=b.dataset.t;if(k==='timer')return openTimer();
   const p={[k]:!S[k]};if(k==='turbo'&&p.turbo&&(!CAP||CAP.tog.eco))p.eco=false;if(k==='eco'&&p.eco&&(!CAP||CAP.tog.turbo))p.turbo=false;send(p,true)};
-$('profiles').innerHTML=PROFILES.map((p,i)=>`<button class="prof" data-p="${i}"><b>${p.n}</b><span>${p.d}</span></button>`).join('');
+$('profiles').innerHTML=PROFILES.map((p,i)=>`<button class="prof" data-p="${i}" title="${p.d}">${svg(p.ic)}<b>${p.n}</b></button>`).join('');
 $('profiles').onclick=e=>{const b=e.target.closest('.prof');if(!b)return;const p=PROFILES[b.dataset.p];buzz();
   send(Object.assign({},p.s),true);if(p.timer)setTimer(p.timer,false);toast('הופעל: '+p.n+(p.timer?` · כיבוי בעוד ${p.timer} ש׳`:''))};
 function profActive(p){
@@ -892,7 +933,7 @@ let tt;function toast(m){document.querySelector('.toast')?.remove();const t=docu
 /* ---------- render ---------- */
 function renderConn(){
   const map={off:['','לא מחובר'],wait:['','מתחבר...'],on:['on','מחובר'],offline:['err','המזגן לא ברשת'],err:['err','שגיאת חיבור']};
-  const[c,t]=map[connState]||map.off;$('connDot').className='dot '+c;$('connTxt').textContent=t;
+  const[c,t]=map[connState]||map.off;$('connDot').className='dot '+c;$('connTxt').textContent=t;$('conn').classList.toggle('only-dot',connState==='on');$('conn').setAttribute('aria-label',t);
 }
 function render(){
   const m=MODES.find(x=>x.id===S.mode)||MODES[0];
