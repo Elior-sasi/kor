@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.6">
+<meta name="app-version" content="3.7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -368,6 +368,11 @@ html,body{height:100%;overflow:hidden}
 .bottom-bar{overflow:visible!important}
 .bottom-bar::after{content:"";position:absolute;left:0;right:0;top:100%;height:160px;background:inherit;pointer-events:none}
 /* 3.4: iOS home-screen viewport shorter than the screen - stretch to the real bottom */
+/* 3.7 */
+.toast{top:auto!important;bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 84px)!important}
+@keyframes toastIn{from{transform:translate(-50%,16px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.air{top:-3%!important}
+.air-r{right:-10px!important}.air-l{left:-10px!important}
 </style>
 </head><body>
 <div class="app" id="app">
