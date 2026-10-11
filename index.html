@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.7">
+<meta name="app-version" content="3.8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -373,6 +373,24 @@ html,body{height:100%;overflow:hidden}
 @keyframes toastIn{from{transform:translate(-50%,16px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 .air{top:-3%!important}
 .air-r{right:-10px!important}.air-l{left:-10px!important}
+/* 3.8: fit on one screen */
+.app{gap:12px!important;padding-top:calc(env(safe-area-inset-top,0px) + 10px)!important;padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
+.top h1{font-size:26px}
+.menu-btn,.pill.only-dot{width:36px!important;height:36px!important}
+.dial{width:min(100%,330px,calc(100dvh - 400px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)))!important;min-width:200px;container-type:inline-size}
+.temp{font-size:min(96px,29cqw)!important}
+.temp sup{font-size:min(28px,8.5cqw)!important}
+.mode-lbl{font-size:min(15px,4.8cqw)!important;margin-top:min(6px,1.5cqw)!important}
+.indoor{font-size:min(13.5px,4.2cqw)!important;margin-top:min(6px,1.5cqw)!important}
+.step{width:min(50px,16cqw)!important;height:min(50px,16cqw)!important}
+.hero{margin-bottom:-22px!important}
+.step{width:50px!important;height:50px!important;font-size:26px!important}
+.power{padding:14px!important}
+.turbo{width:72px!important}
+.sec h2{margin-bottom:6px!important}
+.prof{padding:9px 4px!important;gap:4px!important}
+.prof svg{width:20px!important;height:20px!important}
+.more summary{padding:13px 16px!important}
 </style>
 </head><body>
 <div class="app" id="app">
