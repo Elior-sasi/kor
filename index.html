@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="4.2">
+<meta name="app-version" content="4.3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -1055,19 +1055,20 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
 (function fitDial(){
   const dial=document.getElementById('dial'),more=document.getElementById('moreDet'),bar=document.getElementById('bottomBar');
   const fit=()=>{if(!dial||!more||!bar)return;
-    const sum=more.querySelector('summary');document.getElementById('app').style.setProperty('gap','12px','important');const maxW=Math.min(dial.parentElement.clientWidth,370);
+    const sum=more.open?more.querySelector('summary'):more;const app0=document.getElementById('app');app0.style.setProperty('gap','12px','important');
+    app0.style.setProperty('padding-bottom',Math.ceil(app0.getBoundingClientRect().bottom-bar.getBoundingClientRect().top+10)+'px','important');const maxW=Math.min(dial.parentElement.clientWidth,370);
     for(let k=0;k<3;k++){
       const w=dial.getBoundingClientRect().width;
-      const slack=bar.getBoundingClientRect().top-20-(sum.getBoundingClientRect().bottom+(more.open?0:0));
+      const slack=bar.getBoundingClientRect().top-12-(sum.getBoundingClientRect().bottom+(more.open?0:0));
       const nw=Math.max(170,Math.min(maxW,Math.round(w+slack)));
       if(Math.abs(nw-w)<2)break;
       dial.style.setProperty('width',nw+'px','important');
     }
     const app=document.getElementById('app');app.style.setProperty('gap','12px','important');
-    const left=bar.getBoundingClientRect().top-20-sum.getBoundingClientRect().bottom;
+    const left=bar.getBoundingClientRect().top-12-sum.getBoundingClientRect().bottom;
     if(left>4)app.style.setProperty('gap',Math.min(30,12+left/5)+'px','important');
     app.scrollTop=more.open?app.scrollTop:0;
-    app.style.setProperty('overflow-y',(more.open||app.scrollHeight>app.clientHeight+2)?'auto':'hidden','important');
+    app.style.setProperty('overflow-y',(more.open||app.scrollHeight>app.clientHeight+1)?'auto':'hidden','important');
   };
   more.addEventListener('toggle',()=>setTimeout(fit,30));
   document.addEventListener('touchmove',e=>{if(e.target.closest('.scrim'))return;
