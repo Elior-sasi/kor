@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="2.5">
+<meta name="app-version" content="2.6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,8 +23,7 @@
   --f-body:"Heebo",system-ui,sans-serif; --f-num:"Sora","Heebo",system-ui,sans-serif;
   color-scheme:dark;
 }
-html,body{height:100%}
-html{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+html,body{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 *{box-sizing:border-box}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
@@ -167,7 +166,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .small-link{font-size:13px;color:var(--muted);text-decoration:underline;align-self:center}
 .sheet{max-height:92vh;overflow-y:auto}
 .app.busy .power{opacity:.7}
-html,body{overflow-x:hidden;overscroll-behavior-x:none;max-width:100%}
+body{overflow-x:clip;overscroll-behavior-x:none;max-width:100%}
 html,body,button,.dial,.chip,.tog,.prof{touch-action:manipulation}
 .profiles{touch-action:pan-x pan-y;overscroll-behavior-x:contain}
 .app{overflow-x:clip}
@@ -218,7 +217,7 @@ body{font-family:var(--f-body);letter-spacing:-.01em;-webkit-font-smoothing:anti
 body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
   background:radial-gradient(60% 45% at 50% 22%,var(--accent-soft),transparent 70%),radial-gradient(50% 40% at 85% 85%,rgba(120,120,255,.10),transparent 70%),#000;
   transition:background .6s}
-.app{gap:20px;padding-top:22px}
+.app{gap:20px;padding-top:calc(env(safe-area-inset-top,0px) + 22px)}
 .top h1{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
 .sub{font-size:15px;color:var(--muted)}
 .glassy,.pick button,.pill,.menu-btn,.step,.seg,.tog,.prof,.more,.bb,.turbo,.air svg,.chip,.item,.btn,.timer-line,.choice,.field input,.field select,.stat-big>div,.hint,.icon-btn{
