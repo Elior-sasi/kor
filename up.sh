@@ -10,6 +10,8 @@ printf 'venv/\n*.sh\n' > .gcloudignore
 [ -s .tick ] || (head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32 > .tick)
 T=$(cat .tick)
 gcloud config set project $P >/dev/null 2>&1
+A=$(gcloud auth list --format="value(account)" 2>/dev/null | head -n1)
+gcloud config set account "${A:-nmkhj5@gmail.com}" >/dev/null 2>&1
 echo "▶ מפעיל תזמון בגוגל..."
 gcloud services enable cloudscheduler.googleapis.com --quiet
 echo "▶ מעלה את השרת (2-4 דקות)..."
