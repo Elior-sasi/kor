@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="4.0">
+<meta name="app-version" content="4.1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -1070,6 +1070,8 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
     app.style.setProperty('overflow-y',(more.open||app.scrollHeight>app.clientHeight+2)?'auto':'hidden','important');
   };
   more.addEventListener('toggle',()=>setTimeout(fit,30));
+  document.addEventListener('touchmove',e=>{if(e.target.closest('.scrim'))return;
+    const app=document.getElementById('app');if(app.style.getPropertyValue('overflow-y')==='hidden')e.preventDefault()},{passive:false});
   addEventListener('load',fit);addEventListener('resize',()=>setTimeout(fit,50));setTimeout(fit,60);setTimeout(fit,600);
   window.__fitDial=fit;
 })();
