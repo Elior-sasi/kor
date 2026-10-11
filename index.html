@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.0">
+<meta name="app-version" content="3.1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -350,6 +350,10 @@ button:active{transform:scale(.96)}
   .indoor{color:#000!important}
 }
 .brand{direction:ltr;font-weight:700;letter-spacing:-.03em;background:linear-gradient(90deg,var(--fg) 40%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+/* own scroller with hidden indicator */
+html,body{height:100%;overflow:hidden}
+.app{height:100dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-y:contain;box-sizing:border-box}
+.app::-webkit-scrollbar{display:none;width:0;height:0}
 </style>
 </head><body>
 <div class="app" id="app">
