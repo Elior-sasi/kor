@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="1.9">
+<meta name="app-version" content="2.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -138,6 +138,18 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .pick button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);font-size:14px;color:var(--fg)}
 .pick button svg{width:24px;height:24px}
 .pick button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.power-row{display:flex;gap:10px}
+.power-row .power{flex:1;width:auto}
+.turbo{flex:0 0 auto;width:86px;border-radius:20px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12.5px;color:var(--muted)}
+.turbo svg{width:22px;height:22px}
+.turbo[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.air{position:absolute;top:2%;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;color:var(--muted);padding:6px;border-radius:14px;z-index:3;min-width:56px}
+.air svg{width:24px;height:24px;padding:7px;box-sizing:content-box;border-radius:50%;background:var(--surface);border:1px solid var(--line)}
+.air-r{right:0}.air-l{left:0}
+.air[aria-pressed="true"]{color:var(--accent)}
+.air[aria-pressed="true"] svg{background:var(--accent-soft);border-color:var(--accent)}
+.indoor{font-size:13.5px!important;color:var(--fg)!important;opacity:.85;margin-top:6px!important}
+.indoor .arr{color:var(--accent)}
 .menu-list{display:flex;flex-direction:column;gap:8px}
 .menu-list .item{text-align:start;width:100%}
 .menu-list .item svg{width:22px;height:22px;color:var(--accent);flex:0 0 auto}
@@ -222,15 +234,20 @@ input,select,textarea{font-size:16px!important}
         <div class="indoor" id="indoor"></div>
       </div>
       <div class="knob-hit" id="knobHit" aria-hidden="true"></div>
+      <button class="air air-r" id="airV" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg><span id="airVt">נדנוד</span></button>
+      <button class="air air-l" id="airH" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span id="airHt">קבוע</span></button>
       <button class="step minus" id="minus" aria-label="הורד מעלה">−</button>
       <button class="step plus" id="plus" aria-label="העלה מעלה">+</button>
     </div>
   </section>
 
+  <div class="power-row">
   <button class="power" id="power" aria-pressed="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
     <span id="powerTxt">הדלק</span>
   </button>
+  <button class="turbo" id="turboBtn" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg><span>טורבו</span></button>
+  </div>
   <button class="timer-line" id="timerLine" hidden></button>
 
   <section class="sec"><h2>פרופילים</h2><div class="profiles" id="profiles"></div></section>
@@ -650,6 +667,18 @@ function openMenu(){
     ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
 }
 $('menuBtn').onclick=openMenu;
+const isSwingV=v=>/^(auto|swing|all|full)$/i.test(String(v));
+let lastVaneFixed=null;
+$('airV').onclick=()=>{if(!CAP||!CAP.vane)return;buzz();const o=CAP.vane.opts;
+  if(isSwingV(S.vane)){const f=lastVaneFixed&&o.includes(lastVaneFixed)?lastVaneFixed:(o.find(x=>!isSwingV(x)&&!/^(off|fixed|stop|close)$/i.test(x))||o.find(x=>!isSwingV(x)));if(f!==undefined)send({vane:f},true)}
+  else{lastVaneFixed=S.vane;const sw=o.find(isSwingV);if(sw!==undefined)send({vane:sw},true)}};
+$('airH').onclick=()=>{buzz();send({hswing:!S.hswing},true)};
+function turboMode(){if(!CAP)return 'tog';if(CAP.tog.turbo)return 'tog';if(CAP.fan&&CAP.fan.opts.some(o=>/^(strong|turbo|boost)$/i.test(o.raw)))return 'fan';return null}
+let fanBeforeTurbo=null;
+function turboOn(){const t=turboMode();if(t==='tog')return !!S.turbo;if(t==='fan')return /^(strong|turbo|boost)$/i.test(String(S.fan));return false}
+$('turboBtn').onclick=()=>{buzz();const t=turboMode();if(!S.power)return toast('המזגן כבוי');
+  if(t==='tog')return send({turbo:!S.turbo,...(!S.turbo&&(!CAP||CAP.tog.eco)?{eco:false}:{})},true);
+  if(t==='fan'){if(turboOn()){send({fan:fanBeforeTurbo||'auto'},true)}else{fanBeforeTurbo=S.fan;send({fan:CAP.fan.opts.find(o=>/^(strong|turbo|boost)$/i.test(o.raw)).raw},true)}}};
 const FAN_IC='<path d="M12 12c0-4 1-8 4-8s3 4-4 8Zm0 0c4 0 8 1 8 4s-4 3-8-4Zm0 0c0 4-1 8-4 8s-3-4 4-8Zm0 0c-4 0-8-1-8-4s4-3 8 4Z"/>';
 function curModes(){return CAP&&CAP.mode&&Object.keys(CAP.mode.toRaw).length?MODES.filter(m=>m.id in CAP.mode.toRaw):MODES}
 function curFans(){const l=CAP?(CAP.fan?CAP.fan.opts:[]):['auto','low','mid','high'].map(r=>({raw:r,label:FAN_LBL[r]}));return [...l].sort((a,b)=>fanLv(a.raw)-fanLv(b.raw))}
@@ -798,7 +827,9 @@ function render(){
   const fanOnly=S.mode==='fan';
   $('tempNum').textContent=fanOnly?'--':(Number.isInteger(S.temp)?S.temp:S.temp.toFixed(1));
   const has=id=>!CAP||id in CAP.tog;$('modeLbl').textContent=S.power?m.name+(S.turbo&&has('turbo')?' · טורבו':S.eco&&has('eco')?' · חסכוני':''):'כבוי';
-  $('indoor').textContent=S.indoor!=null&&(!CAP||CAP.indoor)?'בחדר '+S.indoor+'°':'';
+  if(S.indoor!=null&&(!CAP||CAP.indoor)){const d=S.indoor-S.temp;
+    let tr='';if(S.power&&!fanOnly&&S.mode!=='dry'){if(Math.abs(d)<1)tr='הגיע לטמפרטורה';else if(d>0&&(S.mode==='cool'||S.mode==='auto'))tr='מתקרר עד '+S.temp+'°';else if(d<0&&(S.mode==='heat'||S.mode==='auto'))tr='מתחמם עד '+S.temp+'°'}
+    $('indoor').innerHTML='בחדר '+S.indoor+'°'+(tr?` <span class="arr">· ${tr}</span>`:'')}else $('indoor').textContent='';
   $('dial').setAttribute('aria-valuenow',S.temp);
   const frac=Math.min(1,Math.max(0,(S.temp-tmin())/(tmax()-tmin())));const a=A0+SPAN*frac;
   $('valArc').setAttribute('d',arc(A0,Math.max(A0+.01,a)));
@@ -810,6 +841,11 @@ function render(){
     b.setAttribute('aria-pressed',on);const s=$('s_'+id);if(s)s.textContent=id==='timer'?(timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל'):(on?'פעיל':'כבוי')});
   document.querySelectorAll('#vanes .chip').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v)===String(S.vane)));
   document.querySelectorAll('.prof').forEach(b=>b.setAttribute('aria-pressed',profActive(PROFILES[b.dataset.p])));
+  const hasV=!!(CAP?CAP.vane&&CAP.vane.opts.some(isSwingV):true),hasH=!!(CAP?CAP.tog.hswing:true);
+  $('airV').hidden=!hasV;$('airH').hidden=!hasH;
+  const vOn=CAP&&CAP.vane?isSwingV(S.vane):!!S.vswing;$('airV').setAttribute('aria-pressed',vOn&&S.power);$('airVt').textContent=vOn?'נדנוד':(CAP&&CAP.vane?vaneLbl(S.vane):'קבוע');
+  $('airH').setAttribute('aria-pressed',!!S.hswing&&S.power);$('airHt').textContent=S.hswing?'נדנוד':'קבוע';
+  $('turboBtn').hidden=!turboMode();$('turboBtn').setAttribute('aria-pressed',turboOn()&&S.power);
   $('bbModeIc').innerHTML=svg(m.ic);$('bbModeTxt').textContent=S.power?m.name:'כבוי';
   const fo=curFans().find(f=>String(f.raw)===String(S.fan));$('bbFan').hidden=!curFans().length;$('bbFanIc').innerHTML=fanLevelIc(S.fan);$('bbFanTxt').textContent=fo?fo.label:'—';
   const dots=(l,c)=>l.map(x=>`<i class="${x===c?'on':''}"></i>`).join('');
