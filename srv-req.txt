@@ -2,3 +2,4 @@ firebase-functions>=0.4.2,<1
 firebase-admin>=6.5,<8
 tuya-device-sharing-sdk>=0.2.1,<0.3
 requests>=2.31
+cryptography>=41

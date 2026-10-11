@@ -6,9 +6,11 @@ mkdir -p ~/k && cd ~/k
 echo "▶ מוריד קוד..."
 curl -fsSL "$B/srv-main.py?$(date +%s)" -o main.py
 curl -fsSL "$B/srv-req.txt?$(date +%s)" -o requirements.txt
-printf 'venv/\n*.sh\n' > .gcloudignore
+printf 'venv/\n*.sh\n.tick\n.vapid\n' > .gcloudignore
 [ -s .tick ] || (head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32 > .tick)
 T=$(cat .tick)
+[ -s .vapid ] || (openssl ecparam -name prime256v1 -genkey -noout | base64 -w0 | tr '+/' '-_' | tr -d '=' > .vapid)
+V=$(cat .vapid)
 gcloud config set project $P >/dev/null 2>&1
 A=$(gcloud auth list --format="value(account)" 2>/dev/null | head -n1)
 gcloud config set account "${A:-nmkhj5@gmail.com}" >/dev/null 2>&1
@@ -16,15 +18,15 @@ echo "▶ מפעיל תזמון בגוגל..."
 gcloud services enable cloudscheduler.googleapis.com --quiet
 echo "▶ מעלה את השרת (2-4 דקות)..."
 gcloud functions deploy kor --gen2 --runtime=python312 --region=$R --source=. --entry-point=kor \
-  --trigger-http --allow-unauthenticated --memory=256Mi --set-env-vars=TICK_SECRET=$T --quiet >/dev/null
+  --trigger-http --allow-unauthenticated --memory=256Mi --timeout=120 --set-env-vars=TICK_SECRET=$T,VAPID_PEM=$V --quiet >/dev/null
 URL=$(gcloud functions describe kor --region=$R --format='value(url)')
 echo "▶ קובע ריצה כל דקה..."
 if gcloud scheduler jobs describe kor-tick --location=$R >/dev/null 2>&1; then
   gcloud scheduler jobs update http kor-tick --location=$R --schedule="* * * * *" --uri="$URL/tick" \
-    --http-method=POST --update-headers="X-Tick=$T" --quiet >/dev/null
+    --http-method=POST --attempt-deadline=150s --update-headers="X-Tick=$T" --quiet >/dev/null
 else
   gcloud scheduler jobs create http kor-tick --location=$R --schedule="* * * * *" --time-zone=Asia/Jerusalem \
-    --uri="$URL/tick" --http-method=POST --headers="X-Tick=$T" --quiet >/dev/null
+    --uri="$URL/tick" --http-method=POST --attempt-deadline=150s --headers="X-Tick=$T" --quiet >/dev/null
 fi
 echo ""
 echo "✅ הכול מוכן"

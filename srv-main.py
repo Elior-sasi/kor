@@ -285,6 +285,132 @@ def _set_once(sess_id, did, minutes, cmds):
         "sess": sess_id, "device": did, "enabled": True, "once_at": time.time() + minutes * 60, "cmds": cmds})
 
 
+# ---------------------------------------------------------------- web push (toaster)
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+
+def _b64u(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def _unb64u(s: str) -> bytes:
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+_vapid_cache = {}
+
+
+def _vapid():
+    if "k" not in _vapid_cache:
+        raw = os.environ.get("VAPID_PEM", "")
+        if not raw:
+            raise ApiError("התראות עוד לא הותקנו בשרת - הרץ עדכון", 503)
+        priv = serialization.load_pem_private_key(_unb64u(raw), None)
+        pub = priv.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        _vapid_cache["k"] = (priv, pub)
+    return _vapid_cache["k"]
+
+
+def _hmac(key, data):
+    return hmac.new(key, data, hashlib.sha256).digest()
+
+
+def _encrypt(sub: dict, payload: bytes) -> bytes:
+    """RFC 8291 aes128gcm."""
+    ua_pub = _unb64u(sub["keys"]["p256dh"])
+    auth = _unb64u(sub["keys"]["auth"])
+    as_priv = ec.generate_private_key(ec.SECP256R1())
+    as_pub = as_priv.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    shared = as_priv.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), ua_pub))
+    ikm = _hmac(_hmac(auth, shared), b"WebPush: info\x00" + ua_pub + as_pub + b"\x01")
+    salt = secrets.token_bytes(16)
+    prk = _hmac(salt, ikm)
+    cek = _hmac(prk, b"Content-Encoding: aes128gcm\x00\x01")[:16]
+    nonce = _hmac(prk, b"Content-Encoding: nonce\x00\x01")[:12]
+    ct = AESGCM(cek).encrypt(nonce, payload + b"\x02", None)
+    return salt + (4096).to_bytes(4, "big") + bytes([len(as_pub)]) + as_pub + ct
+
+
+def _vapid_header(endpoint: str) -> str:
+    priv, pub = _vapid()
+    from urllib.parse import urlparse
+    u = urlparse(endpoint)
+    head = _b64u(json.dumps({"typ": "JWT", "alg": "ES256"}, separators=(",", ":")).encode())
+    claims = _b64u(json.dumps({"aud": f"{u.scheme}://{u.netloc}", "exp": int(time.time()) + 12 * 3600,
+                               "sub": "mailto:nmkhj5@gmail.com"}, separators=(",", ":")).encode())
+    r, s_ = decode_dss_signature(priv.sign(f"{head}.{claims}".encode(), ec.ECDSA(hashes.SHA256())))
+    sig = _b64u(r.to_bytes(32, "big") + s_.to_bytes(32, "big"))
+    return f"vapid t={head}.{claims}.{sig}, k={_b64u(pub)}"
+
+
+def _webpush(sub: dict, data: dict) -> int:
+    body = _encrypt(sub, json.dumps(data, ensure_ascii=False).encode())
+    r = requests.post(sub["endpoint"], data=body, timeout=15, headers={
+        "Authorization": _vapid_header(sub["endpoint"]), "Content-Encoding": "aes128gcm",
+        "Content-Type": "application/octet-stream", "TTL": "300", "Urgency": "high"})
+    return r.status_code
+
+
+def _push_due():
+    """Called from each minute tick: send every alert due in the next ~58s at its exact second."""
+    now = time.time()
+    jobs = []
+    for snap in _db().collection("toaster_push").where("at", ">", 0).stream():
+        d = snap.to_dict()
+        if d.get("at", 0) <= now + 55:
+            # claim it first so an overlapping tick can't send it twice
+            snap.reference.update({"at": 0})
+            jobs.append((d["at"], snap.reference, d))
+    sent = 0
+    for at, ref, d in sorted(jobs, key=lambda x: x[0]):
+        wait = at - time.time()
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            code = _webpush(d["sub"], d.get("msg") or {"title": "הטוסט מוכן", "body": "החשמל נותק"})
+            if code in (404, 410):
+                ref.delete()
+            else:
+                sent += 1
+        except Exception:  # noqa: BLE001
+            pass
+    return sent
+
+
+def _push_route(path, body, ref):
+    col = _db().collection("toaster_push")
+    if path == "/push/key":
+        return {"key": _b64u(_vapid()[1])}
+    if path == "/push/subscribe":
+        sub = body.get("sub") or {}
+        if not sub.get("endpoint") or not (sub.get("keys") or {}).get("p256dh"):
+            raise ApiError("מנוי התראות לא תקין")
+        col.document(_h(sub["endpoint"])).set({"sess": ref.id, "sub": sub, "at": 0})
+        return {"subscribed": True}
+    if path == "/push/at":
+        at = float(body.get("at") or 0)
+        msg = {"title": str(body.get("title") or "הטוסט מוכן")[:60], "body": str(body.get("body") or "")[:120]}
+        n = 0
+        for snap in col.where("sess", "==", ref.id).stream():
+            snap.reference.update({"at": at, "msg": msg})
+            n += 1
+        return {"armed": n}
+    if path == "/push/cancel":
+        for snap in col.where("sess", "==", ref.id).stream():
+            snap.reference.update({"at": 0})
+        return {"cancelled": True}
+    if path == "/push/test":
+        n = 0
+        for snap in col.where("sess", "==", ref.id).stream():
+            _webpush(snap.to_dict()["sub"], {"title": "בדיקה", "body": "ככה תיראה ההתראה כשהטוסט מוכן"})
+            n += 1
+        return {"sent": n}
+    return None
+
+
 def _route(req, path: str, body: dict):
     if path == "/share/qr":
         code = (body.get("userCode") or "").strip()
@@ -320,9 +446,18 @@ def _route(req, path: str, body: dict):
     if path == "/tick":
         if not os.environ.get("TICK_SECRET") or req.headers.get("X-Tick") != os.environ["TICK_SECRET"]:
             raise ApiError("forbidden", 403)
-        return _tick()
+        out = _tick()
+        try:
+            out["pushed"] = _push_due()
+        except Exception as e:  # noqa: BLE001
+            out["push_error"] = str(e)
+        return out
 
     sess, ref = _load(req)
+    if path.startswith("/push/"):
+        res = _push_route(path, body, ref)
+        if res is not None:
+            return res
     if path == "/prefs":
         ref.update({"device": body.get("device"), "track": True})
         return {"saved": True}
@@ -387,7 +522,7 @@ def _route(req, path: str, body: dict):
     raise ApiError("נתיב לא מוכר", 404)
 
 
-@https_fn.on_request(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=60)
+@https_fn.on_request(region="europe-west1", memory=options.MemoryOption.MB_256, timeout_sec=120)
 def kor(req: https_fn.Request) -> https_fn.Response:
     origin = req.headers.get("Origin", "")
     cors = {
