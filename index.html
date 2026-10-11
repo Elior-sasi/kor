@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="1.8">
+<meta name="app-version" content="1.9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -125,6 +125,13 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .bb-t{display:flex;flex-direction:column;min-width:0;flex:1}
 .bb-t small{font-size:11.5px;color:var(--muted)}
 .bb-t b{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb{touch-action:pan-y;user-select:none;-webkit-user-select:none;position:relative;overflow:hidden}
+.bb-t b{transition:transform .18s,opacity .18s}
+.bb.slide-l .bb-t b{transform:translateX(-14px);opacity:0}
+.bb.slide-r .bb-t b{transform:translateX(14px);opacity:0}
+.bb-dots{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);display:flex;gap:3px}
+.bb-dots i{width:4px;height:4px;border-radius:50%;background:var(--line)}
+.bb-dots i.on{background:var(--accent)}
 .bb-chev{width:18px;height:18px;color:var(--muted);flex:0 0 auto}
 .app.is-off .bb-ic{background:var(--surface-2);color:var(--muted)}
 .pick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -235,8 +242,8 @@ input,select,textarea{font-size:16px!important}
     </div>
   </details>
   <nav class="bottom-bar" id="bottomBar">
-    <button class="bb" id="bbMode"><span class="bb-ic" id="bbModeIc"></span><span class="bb-t"><small>מצב</small><b id="bbModeTxt">קירור</b></span><svg class="bb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
-    <button class="bb" id="bbFan"><span class="bb-ic" id="bbFanIc"></span><span class="bb-t"><small>מאוורר</small><b id="bbFanTxt">אוטו</b></span><svg class="bb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
+    <button class="bb" id="bbMode"><span class="bb-dots" id="bbModeDots"></span><span class="bb-ic" id="bbModeIc"></span><span class="bb-t"><small>מצב</small><b id="bbModeTxt">קירור</b></span><svg class="bb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
+    <button class="bb" id="bbFan"><span class="bb-dots" id="bbFanDots"></span><span class="bb-ic" id="bbFanIc"></span><span class="bb-t"><small>מאוורר</small><b id="bbFanTxt">אוטו</b></span><svg class="bb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
   </nav>
   <div hidden><div class="seg" id="modes"></div><section id="fanSec"><div id="fans"></div></section></div>
 </div>
@@ -405,7 +412,7 @@ async function loadDevices(){
 function setDevice(d){
   DEV=d;CFG.dev=d.id;LSset('kor_dev',d.id);CAP=buildCaps(d);readStatus(d.status||{});
   connState=d.online?'on':'offline';buildControls();render();
-  api('/prefs',{device:d.id}).catch(()=>{});loadExtras();
+  api('/prefs',{device:d.id}).catch(()=>{});loadExtras();setTimeout(maybeHint,1500);
 }
 let SCHED=[];
 async function loadExtras(){
@@ -653,11 +660,26 @@ function fanLevelIc(raw){const lv=fanLv(raw);
   const max=Math.max(4,...curFans().map(f=>fanLv(f.raw)));const on=Math.max(1,Math.round(lv/max*4));let s='';
   for(let i=0;i<4;i++){const h=5+i*3.6;s+=`<rect x="${3+i*4.6}" y="${20-h}" width="3.4" height="${h}" rx="1" fill="${i<on?'currentColor':'none'}" stroke="currentColor" stroke-width="1.4" opacity="${lv===0.5&&i===0?.6:1}"/>`}
   return '<svg viewBox="0 0 24 24">'+s+'</svg>'}
-$('bbMode').onclick=()=>{buzz();sheet(`<h3>מצב</h3><div class="pick" id="pk">${curModes().map(m=>`<button data-m="${m.id}" aria-pressed="${m.id===S.mode&&S.power}">${svg(m.ic)}${m.name}</button>`).join('')}</div>`,(el,close)=>{
-  el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;buzz();send({mode:b.dataset.m,power:true},true);close()}})};
-$('bbFan').onclick=()=>{const fans=curFans();if(!fans.length)return toast('אין שליטה במאוורר');buzz();
+function swipeable(btn,list,cur,apply,open){
+  let x0=null,y0=0,moved=false;
+  btn.addEventListener('pointerdown',e=>{x0=e.clientX;y0=e.clientY;moved=false});
+  btn.addEventListener('pointermove',e=>{if(x0===null||moved)return;const dx=e.clientX-x0,dy=e.clientY-y0;
+    if(Math.abs(dx)>28&&Math.abs(dx)>Math.abs(dy)*1.3){moved=true;const l=list();if(!l.length)return;
+      let i=l.indexOf(cur());const step=dx<0?1:-1;i=i<0?0:(i+step+l.length)%l.length;
+      btn.classList.add(dx<0?'slide-l':'slide-r');setTimeout(()=>btn.classList.remove('slide-l','slide-r'),180);
+      buzz();apply(l[i]);hintSeen()}});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>btn.addEventListener(ev,()=>{x0=null}));
+  btn.addEventListener('click',e=>{if(moved){moved=false;e.preventDefault();return}open()});
+}
+function hintSeen(){try{localStorage.setItem('kor_swipe','1')}catch(e){}}
+function maybeHint(){let seen=false;try{seen=localStorage.getItem('kor_swipe')==='1'}catch(e){}if(!seen&&CAP){toast('טיפ: החלק הצידה על מצב או מאוורר לשינוי מהיר');hintSeen()}}
+function openModePick(){buzz();sheet(`<h3>מצב</h3><div class="pick" id="pk">${curModes().map(m=>`<button data-m="${m.id}" aria-pressed="${m.id===S.mode&&S.power}">${svg(m.ic)}${m.name}</button>`).join('')}</div>`,(el,close)=>{
+  el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;buzz();send({mode:b.dataset.m,power:true},true);close()}})}
+function openFanPick(){const fans=curFans();if(!fans.length)return toast('אין שליטה במאוורר');buzz();
   sheet(`<h3>מהירות מאוורר</h3><div class="pick" id="pk">${fans.map(f=>`<button data-f="${esc(f.raw)}" aria-pressed="${String(f.raw)===String(S.fan)&&S.power}">${fanLevelIc(f.raw)}${esc(f.label)}</button>`).join('')}</div>`,(el,close)=>{
-  el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-f]');if(!b)return;buzz();send({fan:b.dataset.f},true);close()}})};
+  el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-f]');if(!b)return;buzz();send({fan:b.dataset.f},true);close()}})}
+swipeable($('bbMode'),()=>curModes().map(m=>m.id),()=>S.mode,id=>send({mode:id,power:true},true),openModePick);
+swipeable($('bbFan'),()=>curFans().map(f=>String(f.raw)),()=>String(S.fan),raw=>send({fan:raw},true),openFanPick);
 $('timerLine').onclick=openTimer;
 try{if(localStorage.getItem('kor_more')==='1')$('moreDet').open=true}catch(e){}
 $('moreDet').addEventListener('toggle',()=>{try{localStorage.setItem('kor_more',$('moreDet').open?'1':'0')}catch(e){}});
@@ -790,6 +812,8 @@ function render(){
   document.querySelectorAll('.prof').forEach(b=>b.setAttribute('aria-pressed',profActive(PROFILES[b.dataset.p])));
   $('bbModeIc').innerHTML=svg(m.ic);$('bbModeTxt').textContent=S.power?m.name:'כבוי';
   const fo=curFans().find(f=>String(f.raw)===String(S.fan));$('bbFan').hidden=!curFans().length;$('bbFanIc').innerHTML=fanLevelIc(S.fan);$('bbFanTxt').textContent=fo?fo.label:'—';
+  const dots=(l,c)=>l.map(x=>`<i class="${x===c?'on':''}"></i>`).join('');
+  $('bbModeDots').innerHTML=dots(curModes().map(x=>x.id),S.power?S.mode:null);$('bbFanDots').innerHTML=dots(curFans().map(f=>String(f.raw)),String(S.fan));
   $('bottomBar').style.gridTemplateColumns=curFans().length?'1fr 1fr':'1fr';
   const tl=timerLbl();$('timerLine').hidden=!tl;if(tl)$('timerLine').textContent=(S.timerPower?'⏱ הדלקה בעוד ':'⏱ כיבוי בעוד ')+tl+' · שנה';
   document.querySelectorAll('#toggles [data-x]').forEach(b=>{const on=!!S['x_'+b.dataset.x];b.setAttribute('aria-pressed',on);const s=document.getElementById('sx_'+b.dataset.x);if(s)s.textContent=on?'פעיל':'כבוי'});
