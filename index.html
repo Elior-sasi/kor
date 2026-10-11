@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="2.7">
+<meta name="app-version" content="2.8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -293,7 +293,7 @@ button:active{transform:scale(.96)}
 .profiles{display:grid!important;grid-template-columns:repeat(4,1fr);gap:8px;overflow:visible}
 .prof{flex-direction:column;align-items:center;gap:6px!important;padding:12px 4px!important;min-width:0!important;text-align:center}
 .prof svg{width:22px;height:22px;color:var(--muted)}
-.prof b{font-size:12.5px!important;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.prof b{font-size:13px!important;font-weight:500;line-height:1.2;max-width:100%;overflow-wrap:anywhere}
 .prof[aria-pressed="true"] svg{color:var(--accent)}
 /* iOS settings-style list */
 #toggles{display:flex!important;flex-direction:column;gap:0;border-radius:20px;overflow:hidden;background:var(--glass);border:.5px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi)}
@@ -435,7 +435,7 @@ const EXTRA_HE={
 };
 const PROFILES=[
   {n:'שינה',ic:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',d:'26° · נמוך · כיבוי בעוד 3 ש׳',s:{power:true,mode:'cool',temp:26,fan:'low',turbo:false,eco:true,display:false},timer:3},
-  {n:'חוזר הביתה',ic:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',d:'23° · אוטו · טורבו',s:{power:true,mode:'cool',temp:23,fan:'auto',turbo:true,eco:false}},
+  {n:'הביתה',ic:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',d:'23° · אוטו · טורבו',s:{power:true,mode:'cool',temp:23,fan:'auto',turbo:true,eco:false}},
   {n:'חורף',ic:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',d:'23° חימום · בינוני',s:{power:true,mode:'heat',temp:23,fan:'mid',turbo:false}},
   {n:'לחות',ic:'<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>',d:'ייבוש · 25°',s:{power:true,mode:'dry',temp:25,fan:'auto'}}
 ];
