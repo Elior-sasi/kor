@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.1">
+<meta name="app-version" content="3.2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -354,6 +354,11 @@ button:active{transform:scale(.96)}
 html,body{height:100%;overflow:hidden}
 .app{height:100dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-y:contain;box-sizing:border-box}
 .app::-webkit-scrollbar{display:none;width:0;height:0}
+/* 3.2: full-screen scroller + docked bottom bar */
+.app{position:fixed;inset:0;height:auto!important;max-width:none!important;margin:0!important;padding-left:max(16px,calc((100vw - 460px)/2))!important;padding-right:max(16px,calc((100vw - 460px)/2))!important;padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))!important}
+.bottom-bar{left:0!important;right:0!important;bottom:0!important;max-width:none!important;border-radius:0!important;border:0!important;border-top:.5px solid var(--glass-edge)!important;
+  padding:8px max(12px,calc((100vw - 460px)/2)) calc(8px + env(safe-area-inset-bottom,0px))!important;background:rgba(18,18,20,.82)!important;box-shadow:none!important}
+@media (prefers-color-scheme:light){.bottom-bar{background:rgba(249,249,251,.88)!important}}
 </style>
 </head><body>
 <div class="app" id="app">
