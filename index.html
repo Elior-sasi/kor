@@ -2,8 +2,8 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-version" content="1.4">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="app-version" content="1.6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -118,6 +118,12 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .small-link{font-size:13px;color:var(--muted);text-decoration:underline;align-self:center}
 .sheet{max-height:92vh;overflow-y:auto}
 .app.busy .power{opacity:.7}
+html,body{overflow-x:hidden;overscroll-behavior-x:none;max-width:100%}
+html,body,button,.dial,.chip,.tog,.prof{touch-action:manipulation}
+.profiles{touch-action:pan-x pan-y;overscroll-behavior-x:contain}
+.app{overflow-x:clip}
+input,select,textarea{font-size:16px!important}
+.field input[type=time]{font-size:28px!important}
 .prof[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
 .prof[aria-pressed="true"] b{color:var(--accent)}
 .list{display:flex;flex-direction:column;gap:8px}
@@ -185,6 +191,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 
   <section class="sec"><h2>מצב</h2><div class="seg" id="modes"></div></section>
   <section class="sec" id="fanSec"><h2>מהירות מאוורר</h2><div class="seg fan" id="fans"></div></section>
+  <section class="sec" id="vaneSec" hidden><h2>כיוון אנכי</h2><div class="chips" id="vanes"></div></section>
   <section class="sec"><h2>פרופילים</h2><div class="profiles" id="profiles"></div></section>
   <section class="sec"><h2>פונקציות</h2><div class="grid" id="toggles"></div></section>
   <section class="sec" id="moreSec" hidden><h2>אוטומציה</h2><div class="grid" id="more">
@@ -286,6 +293,8 @@ function buildCaps(dev){
   TOGS.forEach(t=>{const k=pick(t.codes);if(k&&F[k].type==='Boolean'){c.tog[t.id]=use(k)}});
   const qm=pick(['mute','silent','silence','mute_switch']),qb=pick(['beep','buzzer','sound','voice','beep_switch','buzzer_switch']);
   if(qm&&F[qm].type==='Boolean')c.quiet={code:use(qm),inv:false};else if(qb&&F[qb].type==='Boolean')c.quiet={code:use(qb),inv:true};
+  const vg=pick(['gear_vertical','vertical_gear','angle_vertical','vertical_position']);
+  if(vg&&F[vg].type==='Enum'){use(vg);c.vane={code:vg,opts:((F[vg].values||{}).range||[])}}
   const tm=pick(['countdown_set','countdown','timer','countdown_1']);
   if(tm){use(tm);const f=F[tm];c.timer={code:tm,type:f.type,values:f.values||{}};c.tog.timer=tm;}
   c.timerLeft=['countdown_left','timer_left'].find(k=>k in (dev.status||{}));
@@ -302,6 +311,7 @@ function readStatus(st){
   if(CAP.fan&&g(CAP.fan.code)!==undefined)S.fan=st[CAP.fan.code];
   Object.entries(CAP.tog).forEach(([id,k])=>{if(id!=='timer'&&g(k)!==undefined)S[id]=!!st[k]});
   CAP.extra.forEach(x=>{if(g(x.code)!==undefined)S['x_'+x.code]=!!st[x.code]});
+  if(CAP.vane&&g(CAP.vane.code)!==undefined)S.vane=st[CAP.vane.code];
   if(CAP.quiet&&g(CAP.quiet.code)!==undefined)S.quiet=CAP.quiet.inv?!st[CAP.quiet.code]:!!st[CAP.quiet.code];
 }
 function fanRawFor(want){ // map a generic speed ('low','mid',...) to this device's value
@@ -319,6 +329,7 @@ function toCommands(p){
   if('temp' in p&&CAP.temp)out.push({code:CAP.temp.code,value:Math.round(p.temp*10**CAP.temp.scale)});
   if('fan' in p&&CAP.fan){const r=fanRawFor(String(p.fan).toLowerCase())??p.fan;if(CAP.fan.opts.some(o=>o.raw===r))out.push({code:CAP.fan.code,value:r})}
   Object.entries(CAP.tog).forEach(([id,k])=>{if(id!=='timer'&&id in p)out.push({code:k,value:!!p[id]})});
+  if('vane' in p&&CAP.vane)out.push({code:CAP.vane.code,value:p.vane});
   if('quiet' in p&&CAP.quiet)out.unshift({code:CAP.quiet.code,value:CAP.quiet.inv?!p.quiet:!!p.quiet});
   Object.keys(p).filter(k=>k.startsWith('x_')).forEach(k=>out.push({code:k.slice(2),value:!!p[k]}));
   return out;
@@ -426,8 +437,13 @@ function buildControls(){
   const extra=CAP?CAP.extra:[];
   $('toggles').innerHTML=togs.map(t=>`<button class="tog" data-t="${t.id}">${svg(t.ic)}<span class="t">${t.t}</span><span class="s" id="s_${t.id}"></span></button>`).join('')+
     extra.map(x=>`<button class="tog" data-x="${esc(x.code)}">${svg(x.ic||'<circle cx="12" cy="12" r="8"/><path d="M12 8v4"/>')}<span class="t">${esc(x.name)}</span><span class="s" id="sx_${esc(x.code)}"></span></button>`).join('');
+  const vo=CAP&&CAP.vane?CAP.vane.opts:[];$('vaneSec').hidden=!vo.length;
+  $('vanes').innerHTML=vo.map(r=>`<button class="chip" data-v="${esc(r)}">${esc(vaneLbl(r))}</button>`).join('');
   drawTicks();
 }
+function vaneLbl(r){const x=String(r).toLowerCase();if(/^(auto|swing|all|full)$/.test(x))return'נדנוד';if(/^(off|fixed|stop|close)$/.test(x))return'קבוע';
+  const n=x.replace(/\D/g,'');if(n)return'מיקום '+n;return({up:'למעלה',down:'למטה',middle:'אמצע',mid:'אמצע'})[x]||r}
+$('vanes').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();send({vane:b.dataset.v},true)};
 function fanIc(n,total){total=Math.max(total,1);const k=Math.min(total,4);let s='';for(let i=0;i<k;i++){const h=4+i*(12/k);s+=`<rect x="${3+i*(18/k)}" y="${20-h}" width="${18/k-2}" height="${h}" rx="1" fill="${Math.ceil(n*k/total)>i?'currentColor':'none'}" stroke="currentColor" stroke-width="1.4"/>`}return s}
 $('modes').onclick=e=>{const b=e.target.closest('button');if(!b)return;buzz();send({mode:b.dataset.m,power:true},true)};
 $('fans').onclick=e=>{const b=e.target.closest('button');if(!b)return;buzz();send({fan:b.dataset.f},true)};
@@ -702,6 +718,7 @@ function render(){
   document.querySelectorAll('#fans button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.f)===String(S.fan)&&S.power));
   document.querySelectorAll('#toggles [data-t]').forEach(b=>{const id=b.dataset.t;const on=id==='timer'?!!timerLbl():!!S[id];
     b.setAttribute('aria-pressed',on);const s=$('s_'+id);if(s)s.textContent=id==='timer'?(timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל'):(on?'פעיל':'כבוי')});
+  document.querySelectorAll('#vanes .chip').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v)===String(S.vane)));
   document.querySelectorAll('.prof').forEach(b=>b.setAttribute('aria-pressed',profActive(PROFILES[b.dataset.p])));
   $('moreSec').hidden=!(linked&&CAP);
   document.querySelectorAll('#toggles [data-x]').forEach(b=>{const on=!!S['x_'+b.dataset.x];b.setAttribute('aria-pressed',on);const s=document.getElementById('sx_'+b.dataset.x);if(s)s.textContent=on?'פעיל':'כבוי'});
