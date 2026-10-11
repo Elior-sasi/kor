@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.3">
+<meta name="app-version" content="3.4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -362,6 +362,9 @@ html,body{height:100%;overflow:hidden}
 /* 3.3: iOS standalone viewport ends above screen bottom - extend the bar below it */
 .bottom-bar{overflow:visible!important}
 .bottom-bar::after{content:"";position:absolute;left:0;right:0;top:100%;height:160px;background:inherit;pointer-events:none}
+/* 3.4: iOS home-screen viewport shorter than the screen - stretch to the real bottom */
+.app{bottom:calc(-1 * var(--vgap,0px))!important}
+.bottom-bar{bottom:calc(-1 * var(--vgap,0px))!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -1023,6 +1026,12 @@ function render(){
 // demo simulation only
 setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.indoor+=S.indoor>S.temp?-1:1;saveDemo();render()}},20000);
 
+(function fixGap(){
+  const set=()=>{let g=0;const sa=window.navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+    if(sa&&screen.height>innerHeight&&Math.abs(screen.width-innerWidth)<2)g=Math.min(120,screen.height-innerHeight);
+    document.documentElement.style.setProperty('--vgap',g+'px')};
+  set();addEventListener('resize',set);addEventListener('orientationchange',()=>setTimeout(set,300));
+})();
 (function autoUpdate(){
   const cur=(document.querySelector('meta[name="app-version"]')||{}).content||'0';
   const chk=()=>fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{
