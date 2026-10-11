@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="3.8">
+<meta name="app-version" content="3.9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -377,7 +377,7 @@ html,body{height:100%;overflow:hidden}
 .app{gap:12px!important;padding-top:calc(env(safe-area-inset-top,0px) + 10px)!important;padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
 .top h1{font-size:26px}
 .menu-btn,.pill.only-dot{width:36px!important;height:36px!important}
-.dial{width:min(100%,330px,calc(100dvh - 400px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)))!important;min-width:200px;container-type:inline-size}
+.dial{width:min(100%,330px,calc(100dvh - 400px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)))!important;min-width:170px;container-type:inline-size}
 .temp{font-size:min(96px,29cqw)!important}
 .temp sup{font-size:min(28px,8.5cqw)!important}
 .mode-lbl{font-size:min(15px,4.8cqw)!important;margin-top:min(6px,1.5cqw)!important}
@@ -1052,6 +1052,24 @@ function render(){
 // demo simulation only
 setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.indoor+=S.indoor>S.temp?-1:1;saveDemo();render()}},20000);
 
+(function fitDial(){
+  const dial=document.getElementById('dial'),more=document.getElementById('moreDet'),bar=document.getElementById('bottomBar');
+  const fit=()=>{if(!dial||!more||!bar)return;
+    const sum=more.querySelector('summary');document.getElementById('app').style.setProperty('gap','12px','important');const maxW=Math.min(dial.parentElement.clientWidth,370);
+    for(let k=0;k<3;k++){
+      const w=dial.getBoundingClientRect().width;
+      const slack=bar.getBoundingClientRect().top-20-(sum.getBoundingClientRect().bottom+(more.open?0:0));
+      const nw=Math.max(170,Math.min(maxW,Math.round(w+slack)));
+      if(Math.abs(nw-w)<2)break;
+      dial.style.setProperty('width',nw+'px','important');
+    }
+    const app=document.getElementById('app');app.style.setProperty('gap','12px','important');
+    const left=bar.getBoundingClientRect().top-20-sum.getBoundingClientRect().bottom;
+    if(left>4)app.style.setProperty('gap',Math.min(30,12+left/5)+'px','important');
+  };
+  addEventListener('load',fit);addEventListener('resize',()=>setTimeout(fit,50));setTimeout(fit,60);setTimeout(fit,600);
+  window.__fitDial=fit;
+})();
 (function fixGap(){
   const set=()=>{let g=0;const sa=window.navigator.standalone||matchMedia('(display-mode: standalone)').matches;
     if(sa&&screen.height>innerHeight&&Math.abs(screen.width-innerWidth)<2)g=Math.min(120,screen.height-innerHeight);
