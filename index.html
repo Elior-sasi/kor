@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="4.5">
+<meta name="app-version" content="4.6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -408,6 +408,17 @@ html,body{height:100%;overflow:hidden}
 .step{bottom:12%!important}
 .step.minus{left:-3%!important}.step.plus{right:-3%!important}
 .hero{margin-bottom:-18px!important}
+/* 4.6 wheel picker */
+.wheels{position:relative;display:flex;justify-content:center;align-items:center;gap:6px;height:200px;direction:ltr;margin:4px 0}
+.wsel{position:absolute;left:12%;right:12%;top:80px;height:40px;border-radius:12px;background:rgba(255,255,255,.08);pointer-events:none}
+.wheel{height:200px;width:80px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;position:relative;z-index:1;
+  -webkit-mask-image:linear-gradient(transparent,#000 35%,#000 65%,transparent);mask-image:linear-gradient(transparent,#000 35%,#000 65%,transparent);touch-action:pan-y}
+.wheel::-webkit-scrollbar{display:none}
+.wpad{height:80px}
+.wi{height:40px;line-height:40px;text-align:center;scroll-snap-align:center;font-family:var(--f-num);font-size:22px;color:var(--muted);font-variant-numeric:tabular-nums;transition:color .15s,font-size .15s}
+.wi.on{color:var(--fg);font-size:26px;font-weight:500}
+.wsfx{font-size:15px;color:var(--muted);width:34px;z-index:1}
+@media (prefers-color-scheme:light){.wsel{background:rgba(0,0,0,.06)}}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -744,16 +755,23 @@ function setTimer(h,powerAfter){
   req.catch(e=>{[S.timerAt,S.timerPower]=prev;render();toast('הטיימר לא נשמר: '+netMsg(e))});
 }
 function openTimer(){
-  const left=timerLeftMin();const cur=left?Math.max(.5,Math.round(left/30)/2):2;
+  const left=timerLeftMin();let tot=left?Math.max(5,Math.round(left/5)*5):120;
+  const H=Array.from({length:13},(_,i)=>i),M=Array.from({length:12},(_,i)=>i*5);
+  const col=(id,arr,sfx)=>`<div class="wheel" id="${id}"><div class="wpad"></div>${arr.map(v=>`<div class="wi" data-v="${v}">${v}</div>`).join('')}<div class="wpad"></div></div><span class="wsfx">${sfx}</span>`;
   sheet(`<h3>${S.power?'כיבוי אוטומטי':'הדלקה אוטומטית'}</h3>
-    <div class="big"><span id="tv"></span> <small>שעות</small></div>
-    <input type="range" id="tr" min="0.5" max="12" step="0.5" value="${cur}" aria-label="משך">
-    ${left?`<p>${S.timerPower?'יידלק':'ייכבה'} בעוד ${timerLbl()}</p>`:''}
+    <div class="wheels"><div class="wsel"></div>${col('wh',H,'ש׳')}${col('wm',M,'דק׳')}</div>
+    ${left?`<p style="text-align:center">${S.timerPower?'יידלק':'ייכבה'} בעוד ${timerLbl()}</p>`:''}
     <div class="row"><button class="btn" id="tc">${left?'בטל טיימר':'סגור'}</button><button class="btn pri" id="ts">הפעל</button></div>`,(el,close)=>{
-    const tr=el.querySelector('#tr'),tv=el.querySelector('#tv'),fmt=()=>tv.textContent=(+tr.value%1?tr.value:(+tr.value).toFixed(0));fmt();
-    tr.oninput=()=>{fmt();buzz()};
+    const IH=40,wh=el.querySelector('#wh'),wm=el.querySelector('#wm');
+    const val=w=>{const i=Math.round(w.scrollTop/IH);const it=w.querySelectorAll('.wi')[i];return it?+it.dataset.v:0};
+    const mark=w=>{const i=Math.round(w.scrollTop/IH);w.querySelectorAll('.wi').forEach((x,k)=>x.classList.toggle('on',k===i))};
+    const set=(w,v,arr)=>{w.scrollTop=Math.max(0,arr.indexOf(v))*IH;mark(w)};
+    set(wh,Math.min(12,Math.floor(tot/60)),H);set(wm,tot%60-(tot%60)%5,M);
+    [wh,wm].forEach(w=>{let last=-1,t;w.addEventListener('scroll',()=>{const i=Math.round(w.scrollTop/IH);if(i!==last){last=i;mark(w);buzz()}
+      clearTimeout(t);t=setTimeout(()=>{w.scrollTo({top:i*IH,behavior:'smooth'})},120)})});
+    el.querySelectorAll('.wi').forEach(x=>x.onclick=()=>{const w=x.parentElement;const k=[...w.querySelectorAll('.wi')].indexOf(x);w.scrollTo({top:k*IH,behavior:'smooth'})});
     el.querySelector('#tc').onclick=()=>{if(left){setTimer(0);toast('הטיימר בוטל')}close()};
-    el.querySelector('#ts').onclick=()=>{setTimer(+tr.value);toast('הטיימר הופעל');close()};
+    el.querySelector('#ts').onclick=()=>{const m=val(wh)*60+val(wm);if(!m)return toast('בחר זמן');setTimer(m/60);toast('הטיימר הופעל');close()};
   });
 }
 const timerLeftMin=()=>S.timerAt&&S.timerAt>Date.now()?Math.ceil((S.timerAt-Date.now())/60000):0;
