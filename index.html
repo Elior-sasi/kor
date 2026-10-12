@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="7.1">
+<meta name="app-version" content="7.2">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -111,8 +111,8 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.tpair{display:flex;flex-direction:column;gap:8px}
 .trow2{display:flex;align-items:center;gap:12px;padding:8px 8px 8px 14px;border-radius:18px;background:var(--fill-2)}
 .trow2 label{flex:1;font-size:16px;color:var(--fg)}
-.sheet .trow2 input[type=time]{width:150px;height:auto!important;font-size:24px!important;padding:8px 6px!important;text-align:center;-webkit-appearance:none;appearance:none;display:flex;align-items:center;justify-content:center;background:var(--fill)!important;border:0}
-.sheet .trow2 input[type=time]::-webkit-date-and-time-value{text-align:center;margin:0}
+.sheet .trow2 input[type=time]{flex:0 0 132px;width:132px!important;min-width:0;max-width:132px;border-radius:14px!important;color:var(--fg)!important;-webkit-text-fill-color:var(--fg);font-family:var(--f-num);font-weight:400;height:auto!important;font-size:24px!important;padding:8px 6px!important;text-align:center;-webkit-appearance:none;appearance:none;display:flex;align-items:center;justify-content:center;background:var(--fill)!important;border:0}
+.sheet .trow2 input[type=time]::-webkit-date-and-time-value{text-align:center;margin:0;color:var(--fg)}
 .trow2.dis input,.trow2.dis label{opacity:.35}
 .tstep{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tstep label{font-size:13px;color:var(--muted)}
