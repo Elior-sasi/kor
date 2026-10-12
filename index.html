@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="7.3">
+<meta name="app-version" content="7.4">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -105,6 +105,10 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .alist .grow{min-width:0}.alist b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet .field{gap:5px}
 [hidden]{display:none!important}
+/* 7.4 lock page bounce */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;inset:0;width:100%}
+.app{overscroll-behavior-y:none!important}
 .seg3{display:flex;gap:6px}.seg3 .chip{flex:1;padding:10px 4px;text-align:center;white-space:nowrap}
 .trow input{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;text-align:center;max-width:100%}
 .chips.one{flex-wrap:nowrap}.chips.one .chip{flex:1 1 0;min-width:0;padding:8px 2px;text-align:center}
