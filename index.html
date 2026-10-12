@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.6">
+<meta name="app-version" content="6.7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -107,7 +107,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .seg3{display:flex;gap:6px}.seg3 .chip{flex:1;padding:10px 4px;text-align:center;white-space:nowrap}
 .trow input{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;text-align:center;max-width:100%}
 .chips.one{flex-wrap:nowrap}.chips.one .chip{flex:1 1 0;min-width:0;padding:8px 2px;text-align:center}
-.trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.trow:has(#sendF:not([hidden])) input{font-size:18px!important;padding-inline:10px!important}
+.trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.trow input{height:52px!important;font-size:20px!important;padding:0 10px!important;line-height:52px}
 .tstep{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tstep label{font-size:13px;color:var(--muted)}
 .tstep .ctl{display:flex;align-items:center;gap:6px}
@@ -1068,7 +1068,7 @@ function openSchedEdit(row){
     <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="${st.kind==='on'}">הדלקה</button><button class="chip" data-k="off" aria-pressed="${st.kind==='off'}">כיבוי</button><button class="chip" data-k="range" aria-pressed="${st.kind==='range'}">טווח שעות</button></div>
     <div class="trow"><div class="field"><label for="stime" id="stl">${st.kind==='range'?'הדלקה':'שעה'}</label><input type="time" id="stime" value="${st.time}"></div><div class="field" id="sendF"${st.kind==='range'?'':' hidden'}><label for="send">כיבוי</label><input type="time" id="send" value="${st.end}"></div></div>
     <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="${st.days.includes(i)}">${d}</button>`).join('')}</div></div>
-    <div id="sOnOpts" style="display:${st.kind==='off'?'none':'flex'};flex-direction:column;gap:14px">
+    <div id="sOnOpts" style="visibility:${st.kind==='off'?'hidden':'visible'};display:flex;flex-direction:column;gap:14px">
       <div class="field"><label>מצב</label><div class="chips one" id="smode">${modes.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${m.id===st.mode}">${m.name}</button>`).join('')}</div></div>
       <div class="tstep"><label>טמפרטורה</label><div class="ctl"><button id="stp" aria-label="יותר">+</button><b id="stv">${st.temp}°</b><button id="stm" aria-label="פחות">−</button></div></div>
     </div>
@@ -1076,7 +1076,7 @@ function openSchedEdit(row){
     <div class="row"><button class="btn" id="sb">ביטול</button><button class="btn pri" id="ss">שמור</button></div>`,(el,close)=>{
     const q=x=>el.querySelector(x);
     const one=(sel,fn)=>q(sel).onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();el.querySelectorAll(sel+' .chip').forEach(c=>c.setAttribute('aria-pressed',c===b));fn&&fn(b)};
-    one('#skind',b=>{st.kind=b.dataset.k;q('#sOnOpts').style.display=st.kind==='off'?'none':'flex';q('#sendF').hidden=st.kind!=='range';q('#stl').textContent=st.kind==='range'?'הדלקה':'שעה'});
+    one('#skind',b=>{st.kind=b.dataset.k;q('#sOnOpts').style.visibility=st.kind==='off'?'hidden':'visible';q('#sendF').hidden=st.kind!=='range';q('#stl').textContent=st.kind==='range'?'הדלקה':'שעה'});
     one('#smode',b=>st.mode=b.dataset.m);
     q('#sdays').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true')};
     const tset=d=>{let i=temps.indexOf(st.temp);if(i<0)i=temps.findIndex(t=>t>=st.temp);st.temp=temps[Math.max(0,Math.min(temps.length-1,i+d))];q('#stv').textContent=st.temp+'°';buzz()};
