@@ -257,12 +257,72 @@ def _tick():
             except Exception:  # noqa: BLE001
                 continue
             on = st.get("switch", st.get("power", st.get("switch_1")))
+            mode = str(st.get("mode", st.get("work_mode", "other")))
             if on:
-                mode = str(st.get("mode", st.get("work_mode", "other")))
                 _db().collection("kor_stats").document(f"{snap.id}_{today}").set(
                     {"sess": snap.id, "date": today, "minutes": firestore.Increment(2),
                      "modes": {mode: firestore.Increment(2)}}, merge=True)
+            try:
+                _watch(snap, sess, did, st, bool(on), mode, now, today)
+            except Exception:  # noqa: BLE001
+                pass
     return {"ran": ran, "errors": errs}
+
+
+FAULTS = ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"]
+
+
+def _fault_codes(v) -> list:
+    try:
+        v = int(v or 0)
+    except (TypeError, ValueError):
+        return []
+    return [c for i, c in enumerate(FAULTS) if v >> i & 1]
+
+
+def _notify(sess_id: str, msg: dict) -> int:
+    n = 0
+    for snap in _db().collection("toaster_push").where("sess", "==", sess_id).stream():
+        try:
+            code = _webpush(snap.to_dict()["sub"], msg)
+            if code in (404, 410):
+                snap.reference.delete()
+            else:
+                n += 1
+        except Exception:  # noqa: BLE001
+            pass
+    return n
+
+
+def _watch(snap, sess, did, st, on, mode, now, today):
+    """Per tracked session, every 2 minutes: temperature log, fault alerts, thermostat."""
+    temp = st.get("temp_current")
+    if isinstance(temp, (int, float)):
+        _db().collection("kor_temps").document(f"{snap.id}_{today}").set(
+            {"sess": snap.id, "date": today, "t": {now.strftime("%H%M"): [temp, 1 if on else 0]}}, merge=True)
+    f = int(st.get("fault") or 0) if str(st.get("fault", 0)).lstrip("-").isdigit() else 0
+    if f != int(sess.get("fault") or 0):
+        snap.reference.update({"fault": f})
+        if f:
+            _notify(snap.id, {"title": "תקלה במזגן", "body": "קוד " + ", ".join(_fault_codes(f) or [str(f)])})
+    th = sess.get("thermo") or {}
+    if not isinstance(temp, (int, float)) or time.time() - float(th.get("last") or 0) < 600:
+        return
+    stop, start = th.get("stop") or {}, th.get("start") or {}
+    act, msg = None, ""
+    if on and stop.get("en") and stop.get("t") is not None:
+        t = float(stop["t"])
+        if (mode == "hot" and temp >= t) or (mode in ("cold", "wet") and temp <= t):
+            act, msg = [{"code": "switch", "value": False}], f"המזגן כובה - החדר הגיע ל-{temp:g}°"
+    if not on and start.get("en") and start.get("t") is not None and start.get("cmds"):
+        t = float(start["t"])
+        if (start.get("dir") == "below" and temp <= t) or (start.get("dir") != "below" and temp >= t):
+            act, msg = start["cmds"], f"המזגן הודלק - בחדר {temp:g}°"
+    if act:
+        _send(sess, snap.reference, did, act)
+        snap.reference.update({"thermo.last": time.time()})
+        if th.get("notify", True):
+            _notify(snap.id, {"title": "תרמוסטט", "body": msg})
 
 
 def _act(req):
@@ -505,6 +565,29 @@ def _route(req, path: str, body: dict):
         days = [s2.to_dict() for s2 in _db().collection("kor_stats").where("sess", "==", ref.id).stream()]
         days.sort(key=lambda x: x.get("date", ""), reverse=True)
         return {"days": days[:31]}
+    if path == "/temps":
+        out = []
+        for s2 in _db().collection("kor_temps").where("sess", "==", ref.id).stream():
+            d = s2.to_dict()
+            out.append({"date": d.get("date"), "t": d.get("t") or {}})
+        out.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return {"days": out[:7]}
+    if path == "/thermo":
+        return {"thermo": sess.get("thermo") or {}, "fault": _fault_codes(sess.get("fault")),
+                "push": len(list(_db().collection("toaster_push").where("sess", "==", ref.id).stream()))}
+    if path == "/thermo/save":
+        th = body.get("thermo") or {}
+        clean = {"stop": {"en": bool((th.get("stop") or {}).get("en")), "t": (th.get("stop") or {}).get("t")},
+                 "start": {k: (th.get("start") or {}).get(k) for k in ("en", "t", "dir", "cmds", "label")},
+                 "notify": bool(th.get("notify", True)), "last": 0}
+        ref.update({"thermo": clean, "track": True, "device": body.get("device") or sess.get("device")})
+        return {"saved": True}
+    if path == "/notify/test":
+        return {"sent": _notify(ref.id, {"title": "Breeze", "body": "ככה ייראו ההתראות מהמזגן"})}
+    if path == "/push/off":
+        for s2 in _db().collection("toaster_push").where("sess", "==", ref.id).stream():
+            s2.reference.delete()
+        return {"off": True}
     if path == "/debug":
         did = body.get("id", "")
         out = {"mode": sess["mode"]}

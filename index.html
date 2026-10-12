@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="7.6">
-<script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));Promise.all(p).then(go,go)}catch(e){}})();</script>
+<meta name="app-version" content="8.0">
+<script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -129,6 +129,18 @@ body{position:fixed;inset:0;width:100%}
 .alist{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .alist .item{padding:10px 10px 10px 12px;gap:8px}.alist .item b{font-size:14px}
 .alist .icon-btn{width:32px;height:32px}
+/* 8.0 */
+.fault-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin:-6px 0 -6px;padding:9px 14px;border-radius:14px;background:rgba(255,80,80,.14);color:#ff7a7a;font-size:14px;font-weight:600}
+.fault-bar svg{width:18px;height:18px}
+.tchart{width:100%;height:80px;display:block}
+.sheet .bars{height:96px}
+.tchart .ln{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.tchart .on{fill:var(--accent);opacity:.14}
+.tchart text{fill:var(--muted);font-size:11px;font-family:var(--f-num)}
+.tsum{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+.tsum b{color:var(--fg);font-weight:500;font-family:var(--f-num)}
+.th-now{font-size:13px;color:var(--muted);line-height:1.5}
+.th-now b{color:var(--fg);font-family:var(--f-num);font-weight:500}
 </style>
 <style>
 .pill{cursor:pointer}
@@ -511,6 +523,7 @@ html,body{height:100%;overflow:hidden}
       <button class="menu-btn" id="menuBtn" aria-label="תפריט"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
   </header>
+  <button class="fault-bar" id="faultBar" hidden></button>
 
   <section class="hero">
     <div class="glow"></div>
@@ -668,6 +681,7 @@ function readStatus(st){
   CAP.extra.forEach(x=>{if(g(x.code)!==undefined)S['x_'+x.code]=!!st[x.code]});
   if(CAP.vane&&g(CAP.vane.code)!==undefined)S.vane=st[CAP.vane.code];
   if(CAP.quiet&&g(CAP.quiet.code)!==undefined)S.quiet=CAP.quiet.inv?!st[CAP.quiet.code]:!!st[CAP.quiet.code];
+  if('fault' in st)S.fault=+st.fault||0;
 }
 function fanRawFor(want){ // map a generic speed ('low','mid',...) to this device's value
   if(!CAP||!CAP.fan)return want;
@@ -730,6 +744,7 @@ async function loadExtras(){
   try{const j=await loadSched();
     if(j.timer){S.timerAt=j.timer.at*1000;S.timerPower=j.timer.power}else{S.timerAt=0}
     loadExtrasLight();render()}catch(e){}
+  try{const j=await api('/thermo');EXTRA.thermo=thermoLbl(j.thermo)}catch(e){}
   try{const j=await api('/stats');const t=(j.days||[]).find(d=>d.date===ymd(new Date()));EXTRA.stats='היום '+hrs(t?t.minutes:0)}catch(e){}
 }
 const ymd=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'});
@@ -979,8 +994,8 @@ const ICON_COPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 function actionLabel(a){if(!a.power)return'כבה';const m=MODES.find(x=>x.id===a.mode);return'הדלק'+(m?' · '+m.name:'')+(a.temp?` ${a.temp}°`:'')}
 
 const setTxt=(id,t)=>{const e=document.getElementById(id);if(e)e.textContent=t};
-const MI={sched:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 14v3l2 1"/>',siri:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',conn:'<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'};
-let EXTRA={sched:'',stats:''};
+const MI={thermo:'<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0Z"/><path d="M12 9v7"/>',sched:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 14v3l2 1"/>',siri:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',conn:'<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'};
+let EXTRA={sched:'',stats:'',thermo:''};
 async function openDiag(){
   const close0=sheet('<h3>בדיקת צפצוף</h3><p>אוסף נתונים מהמזגן...</p>');
   let j;try{j=await api('/debug',{id:DEV.id})}catch(e){close0();return toast(netMsg(e)+(String(e).includes('404')||String(e).includes('לא נמצא')?' - צריך לעדכן את השרת':''))}
@@ -990,13 +1005,64 @@ async function openDiag(){
       const fb=()=>{t.select();try{document.execCommand('copy');toast('הועתק')}catch(e){toast('סמן והעתק ידנית')}};
       if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast('הועתק'),fb);else fb()}});
 }
+const FAULTS=['E0','E1','E2','E3','E4','E5','E6','E7','P8','P9','P10','P11','P12','P13','P14'];
+const faultCodes=v=>FAULTS.filter((c,i)=>(+v||0)>>i&1);
+function renderFault(){const b=$('faultBar');if(!b)return;const c=linked?faultCodes(S.fault):[];const was=!b.hidden;b.hidden=!c.length;
+  if(c.length)b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 20h20Z"/><path d="M12 10v4M12 17.5v.01"/></svg>תקלה במזגן: '+c.join(', ');
+  if(was!==!b.hidden&&window.__fitDial)setTimeout(window.__fitDial,30)}
+$('faultBar').onclick=()=>toast('קוד תקלה שהמזגן מדווח. בדוק בספר ההוראות או פנה לטכנאי');
+const _render0=render;render=function(){_render0();renderFault()};
+const pushOk=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const b64ToU8=b=>{b=b.replace(/-/g,'+').replace(/_/g,'/');b+='='.repeat((4-b.length%4)%4);const r=atob(b);return Uint8Array.from(r,c=>c.charCodeAt(0))};
+async function pushReg(){return navigator.serviceWorker.register('sw.js')}
+async function pushIsOn(){try{if(!pushOk()||Notification.permission!=='granted')return false;const r=await navigator.serviceWorker.getRegistration();return !!(r&&await r.pushManager.getSubscription())}catch(e){return false}}
+async function pushEnable(){
+  if(!pushOk())throw new Error('בטלפון הזה אין התראות. באייפון: האפליקציה צריכה להיות מותקנת במסך הבית');
+  const perm=await Notification.requestPermission();if(perm!=='granted')throw new Error('לא אישרת התראות. אפשר לאשר בהגדרות הטלפון');
+  const reg=await pushReg();await navigator.serviceWorker.ready;
+  const {key}=await api('/push/key');
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(key)});
+  await api('/push/subscribe',{sub:sub.toJSON()});
+}
+async function pushDisable(){try{const r=await navigator.serviceWorker.getRegistration();const sub=r&&await r.pushManager.getSubscription();if(sub)await sub.unsubscribe()}catch(e){}await api('/push/off')}
+function thermoLbl(th){const st=th&&th.stop||{},sa=th&&th.start||{};if(!st.en&&!sa.en)return'כבוי';return'יעד '+(st.t??(sa.dir==='below'?sa.t+2:sa.t-2))+'°'}
+async function openThermo(){
+  const close0=sheet('<h3>תרמוסטט</h3><p>טוען...</p>');
+  let j;try{j=await api('/thermo')}catch(e){close0();return toast(netMsg(e))}
+  const th=j.thermo||{},sp=th.stop||{},sa=th.start||{};
+  const st={cool:sa.dir?sa.dir!=='below':S.mode!=='heat',t:sp.t??(sa.t!=null?(sa.dir==='below'?sa.t+2:sa.t-2):24),off:!!sp.en,on:!!sa.en,push:await pushIsOn()};
+  const sw=(id,v,l)=>`<div class="trow2" style="grid-template-columns:auto 1fr"><button class="sw" id="${id}" aria-pressed="${v}" aria-label="${l}"></button><label>${l}</label></div>`;
+  sheet(`<h3>תרמוסטט</h3>
+    <div class="seg3" id="tdir"><button class="chip" data-c="1" aria-pressed="${st.cool}">קירור</button><button class="chip" data-c="0" aria-pressed="${!st.cool}">חימום</button></div>
+    <div class="tstep"><label>טמפרטורת יעד בחדר</label><div class="ctl"><button id="tp" aria-label="יותר">+</button><b id="tv">${st.t}°</b><button id="tm" aria-label="פחות">−</button></div></div>
+    <div class="tpair">${sw('tOff',st.off,'כבה כשהחדר מגיע ליעד')}${sw('tOn',st.on,'הדלק כשהחדר מתרחק מהיעד ב-2 מעלות')}${sw('tPush',st.push,'התראות לטלפון')}</div>
+    <p class="th-now">בחדר עכשיו: <b>${S.indoor!=null?S.indoor+'°':'לא ידוע'}</b>. המדידה מהחיישן של המזגן, כל 2 דקות. ההתראות כוללות גם תקלות.</p>
+    <div class="err-msg" id="terr"></div>
+    <div class="row"><button class="btn" id="tb">ביטול</button><button class="btn pri" id="ts">שמור</button></div>`,(el,close)=>{
+    const q=x=>el.querySelector(x);
+    q('#tdir').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();st.cool=b.dataset.c==='1';el.querySelectorAll('#tdir .chip').forEach(c=>c.setAttribute('aria-pressed',c===b))};
+    const tset=d=>{st.t=Math.max(16,Math.min(31,st.t+d));q('#tv').textContent=st.t+'°';buzz()};
+    q('#tp').onclick=()=>tset(1);q('#tm').onclick=()=>tset(-1);
+    const tg=id=>{const b=q('#'+id);const v=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',v);buzz();return v};
+    q('#tOff').onclick=()=>{st.off=tg('tOff')};q('#tOn').onclick=()=>{st.on=tg('tOn')};
+    q('#tPush').onclick=async()=>{const v=tg('tPush');q('#terr').textContent='';
+      try{if(v){await pushEnable();await api('/notify/test').catch(()=>{});toast('התראות הופעלו - נשלחה התראת בדיקה')}else{await pushDisable();toast('התראות כובו')}st.push=v}
+      catch(err){q('#tPush').setAttribute('aria-pressed',!v);q('#terr').textContent=err.message||String(err)}};
+    q('#tb').onclick=close;
+    q('#ts').onclick=async()=>{const b=q('#ts');b.disabled=true;b.textContent='שומר...';
+      const thermo={stop:{en:st.off,t:st.t},start:{en:st.on,dir:st.cool?'above':'below',t:st.cool?st.t+2:st.t-2,cmds:toCommands({power:true,mode:st.cool?'cool':'heat',temp:st.t}),label:(st.cool?'קירור ':'חימום ')+st.t+'°'},notify:true};
+      try{await api('/thermo/save',{thermo,device:DEV&&DEV.id});EXTRA.thermo=thermoLbl(thermo);toast('נשמר');close()}
+      catch(err){q('#terr').textContent=netMsg(err);b.disabled=false;b.textContent='שמור'}};
+  });
+}
 function openMenu(){
   const row=(id,ic,t,sub)=>`<button class="item" data-go="${id}">${svg(ic)}<div class="grow"><b>${t}</b><span>${sub||''}</span></div></button>`;
   sheet(`<h3>תפריט</h3><div class="menu-list">
-    ${linked&&CAP?row('timer',MI.timer,'טיימר',timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל')+row('sched',MI.sched,'תזמונים',EXTRA.sched)+row('siri',MI.siri,'Siri ומיקום','קיצורי דרך')+row('stats',MI.stats,'סטטיסטיקה',EXTRA.stats):''}
+    ${linked&&CAP?row('timer',MI.timer,'טיימר',timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל')+row('sched',MI.sched,'תזמונים',EXTRA.sched)+row('siri',MI.siri,'Siri ומיקום','קיצורי דרך')+row('stats',MI.stats,'סטטיסטיקה',EXTRA.stats)+row('thermo',MI.thermo,'תרמוסטט',EXTRA.thermo||'כבוי'):''}
     ${row('conn',MI.conn,'החיבור',linked?'מחובר':'לא מחובר')}
   </div><p style="text-align:center;font-size:12px;margin-top:4px">Breeze ${(document.querySelector('meta[name="app-version"]')||{}).content||''}</p>`,(el,close)=>{el.querySelector('.menu-list').onclick=e=>{const b=e.target.closest('[data-go]');if(!b)return;buzz();
-    ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,diag:openDiag,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
+    ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,diag:openDiag,thermo:openThermo,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
 }
 $('menuBtn').onclick=openMenu;
 const isSwingV=v=>/^(auto|swing|all|full)$/i.test(String(v));
@@ -1162,9 +1228,22 @@ async function openSiri(renew){
   });
 }
 
+function tempChart(temps){
+  const today=ymd(new Date()),d=temps.find(x=>x.date===today)||temps[0];
+  if(!d||!Object.keys(d.t||{}).length)return'<p style="font-size:12.5px">גרף טמפרטורת החדר יתחיל להתמלא מעכשיו, מדידה כל 2 דקות.</p>';
+  const pts=Object.entries(d.t).map(([k,v])=>[+k.slice(0,2)*60+ +k.slice(2),+v[0],+v[1]]).sort((a,b)=>a[0]-b[0]);
+  const ts=pts.map(p=>p[1]),lo=Math.min(...ts),hi=Math.max(...ts),y0=lo-1,y1=hi+1,W=1440,H=100;
+  const Y=t=>H-(t-y0)/(y1-y0)*H;
+  const line=pts.map(p=>`${p[0]},${Y(p[1]).toFixed(1)}`).join(' ');
+  const on=pts.filter(p=>p[2]).map(p=>`<rect class="on" x="${p[0]-1}" y="0" width="3" height="${H}"/>`).join('');
+  const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+  return`<div><div class="tsum"><span>טמפרטורת החדר ${d.date===today?'היום':d.date}</span><span>נמוך <b>${lo}°</b> · גבוה <b>${hi}°</b></span></div>
+    <svg class="tchart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${on}<polyline class="ln" points="${line}"/>${d.date===today?`<line x1="${nm}" x2="${nm}" y1="0" y2="${H}" stroke="var(--muted)" stroke-dasharray="4 6" vector-effect="non-scaling-stroke" opacity=".5"/>`:''}</svg>
+    <div class="tsum" style="direction:ltr"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>`;
+}
 async function openStats(){
   sheet('<h3>סטטיסטיקה</h3><p>טוען...</p>');
-  let days=[];try{days=(await api('/stats')).days||[]}catch(e){return toast(netMsg(e))}
+  let days=[],temps=[];try{const r=await Promise.all([api('/stats'),api('/temps').catch(()=>({days:[]}))]);days=r[0].days||[];temps=r[1].days||[]}catch(e){return toast(netMsg(e))}
   const by={};days.forEach(d=>by[d.date]=d);
   const last7=Array.from({length:7},(_,i)=>{const d=new Date(Date.now()-(6-i)*864e5);const k=ymd(d);return{k,dow:+new Date(k+'T12:00').getDay(),m:(by[k]||{}).minutes||0}});
   const today=last7[6].m,week=last7.reduce((a,x)=>a+x.m,0),max=Math.max(60,...last7.map(x=>x.m));
@@ -1173,9 +1252,9 @@ async function openStats(){
   sheet(`<h3>סטטיסטיקה</h3>
     <div class="stat-big"><div><span>היום</span><b>${hrs(today)}</b></div><div><span>7 ימים</span><b>${hrs(week)}</b></div><div><span>ממוצע ליום</span><b>${hrs(week/7)}</b></div></div>
     <div class="bars">${last7.map((x,i)=>`<div class="bar${i===6?' today':''}"><em>${x.m?Math.round(x.m/6)/10:''}</em><i style="height:${Math.round(x.m/max*100)}%"></i><small>${DAY_HE[x.dow]}</small></div>`).join('')}</div>
-    <p style="text-align:center">שעות פעולה ביום</p>
+    ${tempChart(temps)}
     ${Object.keys(modes).length?`<div>${Object.entries(modes).sort((a,b)=>b[1]-a[1]).map(([r,m])=>`<div class="mode-row"><span>${esc(modeName(r))}</span><span>${hrs(m)}</span></div>`).join('')}</div>`:''}
-    <p>המדידה רצה בשרת כל 2 דקות, מהיום שהופעלה. ${days.length?'':'עוד אין נתונים - יופיעו אחרי שהמזגן יפעל קצת.'}</p>
+    ${days.length?'':'<p>עוד אין נתונים - יופיעו אחרי שהמזגן יפעל קצת.</p>'}
     <button class="btn" id="tx">סגור</button>`,(el,close)=>{el.querySelector('#tx').onclick=close});
 }
 
