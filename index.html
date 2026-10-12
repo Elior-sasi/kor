@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="5.0">
+<meta name="app-version" content="5.1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -678,6 +678,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 let PENDING=0,sending=0,queue={},qT;
 function send(patch,immediate){
+  if('power' in patch&&S.timerAt&&S.timerAt>Date.now()&&patch.power===S.timerPower){setTimeout(()=>setTimer(0),0)}
   if('fan' in patch&&CAP&&CAP.fan){const r=fanRawFor(String(patch.fan).toLowerCase());if(r!==undefined)patch.fan=r}
   const prev=Object.assign({},S);Object.assign(S,patch);render();
   if(!CAP){saveDemo();return}
@@ -761,7 +762,7 @@ function profActive(p){
 function setTimer(h,powerAfter){
   if(powerAfter===undefined)powerAfter=!S.power;
   const prev=[S.timerAt,S.timerPower];
-  S.timerAt=h?Date.now()+h*3600e3:0;S.timerPower=powerAfter;render();
+  S.timerAt=h?Date.now()+h*3600e3:0;S.timerPower=powerAfter;S.timerSetAt=Date.now();render();
   if(!CAP){saveDemo();return}
   const req=h?api('/timer/set',{device:DEV.id,minutes:Math.round(h*60),cmds:toCommands({power:powerAfter})}):api('/timer/clear');
   req.catch(e=>{[S.timerAt,S.timerPower]=prev;render();toast('הטיימר לא נשמר: '+netMsg(e))});
@@ -792,7 +793,7 @@ setInterval(()=>{if(document.visibilityState==='visible')render()},30000);
 const TIMER_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>';
 const EDIT_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>';
 function tickTimer(){$('timerLine').hidden=true;const el=$('dialTimer');if(!el)return;const ms=S.timerAt?S.timerAt-Date.now():0;
-  const was=el.hidden;if(ms<=0){el.hidden=true;if(!was&&window.__fitDial)setTimeout(window.__fitDial,0);return}el.hidden=false;if(was&&window.__fitDial)setTimeout(window.__fitDial,0);
+  const was=el.hidden;if(ms>0&&S.timerPower===S.power&&!sending&&!PENDING&&(!S.timerSetAt||Date.now()-S.timerSetAt>20000)){S.timerAt=0;if(CAP&&linked)api('/timer/clear').catch(()=>{})}const ms2=S.timerAt?S.timerAt-Date.now():0;if(ms2<=0){el.hidden=true;if(!was&&window.__fitDial)setTimeout(window.__fitDial,0);return}el.hidden=false;if(was&&window.__fitDial)setTimeout(window.__fitDial,0);
   const t=Math.ceil(ms/1000),h=Math.floor(t/3600),m=Math.floor(t%3600/60),sec=t%60;
   const clock=(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(sec).padStart(2,'0');
   const html=`${TIMER_IC}<span>${S.timerPower?'הדלקה':'כיבוי'}</span><b>${clock}</b>`;
