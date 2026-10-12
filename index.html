@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="4.9">
+<meta name="app-version" content="5.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -421,8 +421,15 @@ html,body{height:100%;overflow:hidden}
 .wsfx{font-size:15px;color:var(--muted);width:34px;z-index:1}
 @media (prefers-color-scheme:light){.wsel{background:rgba(0,0,0,.06)}}
 /* 4.9 */
-.step{bottom:9%!important}
-.step.minus{left:-8%!important}.step.plus{right:-8%!important}
+.step{bottom:4%!important}
+.step.minus{left:0!important}.step.plus{right:0!important}
+/* 5.0 timer inside dial */
+.dial-timer{pointer-events:auto;display:inline-flex;align-items:center;gap:5px;margin-top:min(8px,2cqw);padding:4px 10px;border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font-size:min(13px,4cqw);z-index:3}
+.dial-timer[hidden]{display:none!important}
+.dial-timer svg{width:min(14px,4.2cqw);height:min(14px,4.2cqw)}
+.dial-timer b{font-family:var(--f-num);font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}
+.hero{margin-bottom:-4px!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -449,6 +456,7 @@ html,body{height:100%;overflow:hidden}
         <div class="temp"><span id="tempNum">24</span><sup>°C</sup></div>
         <div class="mode-lbl" id="modeLbl">קירור</div>
         <div class="indoor" id="indoor"></div>
+        <button class="dial-timer" id="dialTimer" hidden></button>
       </div>
       <div class="knob-hit" id="knobHit" aria-hidden="true"></div>
       <button class="air air-r" id="airV" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg><span id="airVt">נדנוד</span></button>
@@ -783,11 +791,11 @@ const timerLbl=()=>{const m=timerLeftMin();if(!m)return'';return m>=60?`${Math.f
 setInterval(()=>{if(document.visibilityState==='visible')render()},30000);
 const TIMER_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>';
 const EDIT_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>';
-function tickTimer(){const el=$('timerLine');if(!el)return;const ms=S.timerAt?S.timerAt-Date.now():0;
+function tickTimer(){$('timerLine').hidden=true;const el=$('dialTimer');if(!el)return;const ms=S.timerAt?S.timerAt-Date.now():0;
   const was=el.hidden;if(ms<=0){el.hidden=true;if(!was&&window.__fitDial)setTimeout(window.__fitDial,0);return}el.hidden=false;if(was&&window.__fitDial)setTimeout(window.__fitDial,0);
   const t=Math.ceil(ms/1000),h=Math.floor(t/3600),m=Math.floor(t%3600/60),sec=t%60;
   const clock=(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(sec).padStart(2,'0');
-  const html=`${TIMER_IC}<span>${S.timerPower?'הדלקה בעוד':'כיבוי בעוד'}</span><b>${clock}</b>${EDIT_IC}`;
+  const html=`${TIMER_IC}<span>${S.timerPower?'הדלקה':'כיבוי'}</span><b>${clock}</b>`;
   if(el.innerHTML!==html)el.innerHTML=html}
 setInterval(tickTimer,1000);
 
@@ -951,7 +959,7 @@ function openFanPick(){const fans=curFans();if(!fans.length)return toast('אין
   el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-f]');if(!b)return;buzz();send({fan:b.dataset.f},true);close()}})}
 swipeable($('bbMode'),()=>curModes().map(m=>m.id),()=>S.mode,id=>send({mode:id,power:true},true),openModePick);
 swipeable($('bbFan'),()=>curFans().map(f=>String(f.raw)),()=>String(S.fan),raw=>send({fan:raw},true),openFanPick);
-$('timerLine').onclick=openTimer;
+$('timerLine').onclick=openTimer;$('dialTimer').onclick=e=>{e.stopPropagation();openTimer()};
 try{if(localStorage.getItem('kor_more')==='1')$('moreDet').open=true}catch(e){}
 $('moreDet').addEventListener('toggle',()=>{try{localStorage.setItem('kor_more',$('moreDet').open?'1':'0')}catch(e){}});
 
