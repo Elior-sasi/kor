@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.1">
+<meta name="app-version" content="6.2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -460,6 +460,11 @@ html,body{height:100%;overflow:hidden}
 .step{bottom:-7%!important}
 .air{bottom:calc(-7% + min(25px,8cqw))!important}
 .hero{margin-bottom:34px!important}
+/* 6.2 control row as its own flex row */
+.ctl-row{display:flex;align-items:center;justify-content:space-between;gap:8px;direction:rtl;margin-top:-6px}
+.ctl-row .step{position:static!important;transform:none!important;flex:0 0 auto;width:52px!important;height:52px!important}
+.ctl-row .air{position:static!important;transform:none!important;flex:0 1 auto}
+.hero{margin-bottom:-38px!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -489,12 +494,9 @@ html,body{height:100%;overflow:hidden}
         <button class="dial-timer" id="dialTimer" hidden></button>
       </div>
       <div class="knob-hit" id="knobHit" aria-hidden="true"></div>
-      <button class="air air-r" id="airV" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg><span id="airVt">נדנוד</span></button>
-      <button class="air air-l" id="airH" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span id="airHt">קבוע</span></button>
-      <button class="step minus" id="minus" aria-label="הורד מעלה">−</button>
-      <button class="step plus" id="plus" aria-label="העלה מעלה">+</button>
     </div>
   </section>
+  <div class="ctl-row"><button class="step plus" id="plus" aria-label="העלה מעלה">+</button><button class="air air-r" id="airV" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg><span id="airVt">נדנוד</span></button><button class="air air-l" id="airH" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span id="airHt">קבוע</span></button><button class="step minus" id="minus" aria-label="הורד מעלה">−</button></div>
 
   <div class="power-row">
   <button class="power" id="power" aria-pressed="false">
