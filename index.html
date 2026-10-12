@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.4">
+<meta name="app-version" content="6.5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -103,7 +103,9 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .sheet.fits{overflow-y:hidden}
 .alist .grow{min-width:0}.alist b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet .field{gap:5px}
-.seg3{display:flex;gap:6px}.seg3 .chip{flex:1;padding:9px 4px;text-align:center}
+[hidden]{display:none!important}
+.seg3{display:flex;gap:6px}.seg3 .chip{flex:1;padding:10px 4px;text-align:center;white-space:nowrap}
+.trow input{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;text-align:center;max-width:100%}
 .chips.one{flex-wrap:nowrap}.chips.one .chip{flex:1 1 0;min-width:0;padding:8px 2px;text-align:center}
 .trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.trow:has(#sendF:not([hidden])) input{font-size:18px!important;padding-inline:10px!important}
 .tstep{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -1060,7 +1062,7 @@ function openSchedEdit(row){
   const modes=CAP&&CAP.mode&&Object.keys(CAP.mode.toRaw).length?MODES.filter(m=>m.id in CAP.mode.toRaw):MODES;
   const temps=Array.from({length:Math.round((tmax()-tmin())/tstep())+1},(_,i)=>tmin()+i*tstep());
   sheet(`<h3>${row?'עריכת תזמון':'תזמון חדש'}</h3>
-    <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="${st.kind==='on'}">הדלקה</button><button class="chip" data-k="off" aria-pressed="${st.kind==='off'}">כיבוי</button><button class="chip" data-k="range" aria-pressed="${st.kind==='range'}">הדלקה עד שעה</button></div>
+    <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="${st.kind==='on'}">הדלקה</button><button class="chip" data-k="off" aria-pressed="${st.kind==='off'}">כיבוי</button><button class="chip" data-k="range" aria-pressed="${st.kind==='range'}">טווח שעות</button></div>
     <div class="trow"><div class="field"><label for="stime" id="stl">${st.kind==='range'?'הדלקה':'שעה'}</label><input type="time" id="stime" value="${st.time}"></div><div class="field" id="sendF"${st.kind==='range'?'':' hidden'}><label for="send">כיבוי</label><input type="time" id="send" value="${st.end}"></div></div>
     <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="${st.days.includes(i)}">${d}</button>`).join('')}</div></div>
     <div id="sOnOpts" style="display:${st.kind==='off'?'none':'flex'};flex-direction:column;gap:14px">
