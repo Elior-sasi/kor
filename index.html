@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="5.1">
+<meta name="app-version" content="5.2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -430,6 +430,9 @@ html,body{height:100%;overflow:hidden}
 .dial-timer svg{width:min(14px,4.2cqw);height:min(14px,4.2cqw)}
 .dial-timer b{font-family:var(--f-num);font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}
 .hero{margin-bottom:-4px!important}
+/* 5.2 */
+.app.is-off .bb-t b{color:var(--muted)}
+.app.is-off .bb-dots i.on{background:var(--muted)}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -953,10 +956,10 @@ function swipeable(btn,list,cur,apply,open){
 }
 function hintSeen(){try{localStorage.setItem('kor_swipe','1')}catch(e){}}
 function maybeHint(){let seen=false;try{seen=localStorage.getItem('kor_swipe')==='1'}catch(e){}if(!seen&&CAP){toast('טיפ: החלק הצידה על מצב או מאוורר לשינוי מהיר');hintSeen()}}
-function openModePick(){buzz();sheet(`<h3>מצב</h3><div class="pick" id="pk">${curModes().map(m=>`<button data-m="${m.id}" aria-pressed="${m.id===S.mode&&S.power}">${svg(m.ic)}${m.name}</button>`).join('')}</div>`,(el,close)=>{
+function openModePick(){buzz();sheet(`<h3>מצב</h3><div class="pick" id="pk">${curModes().map(m=>`<button data-m="${m.id}" aria-pressed="${m.id===S.mode}">${svg(m.ic)}${m.name}</button>`).join('')}</div>`,(el,close)=>{
   el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;buzz();send({mode:b.dataset.m,power:true},true);close()}})}
 function openFanPick(){const fans=curFans();if(!fans.length)return toast('אין שליטה במאוורר');buzz();
-  sheet(`<h3>מהירות מאוורר</h3><div class="pick" id="pk">${fans.map(f=>`<button data-f="${esc(f.raw)}" aria-pressed="${String(f.raw)===String(S.fan)&&S.power}">${fanLevelIc(f.raw)}${esc(f.label)}</button>`).join('')}</div>`,(el,close)=>{
+  sheet(`<h3>מהירות מאוורר</h3><div class="pick" id="pk">${fans.map(f=>`<button data-f="${esc(f.raw)}" aria-pressed="${String(f.raw)===String(S.fan)}">${fanLevelIc(f.raw)}${esc(f.label)}</button>`).join('')}</div>`,(el,close)=>{
   el.querySelector('#pk').onclick=e=>{const b=e.target.closest('[data-f]');if(!b)return;buzz();send({fan:b.dataset.f},true);close()}})}
 swipeable($('bbMode'),()=>curModes().map(m=>m.id),()=>S.mode,id=>send({mode:id,power:true},true),openModePick);
 swipeable($('bbFan'),()=>curFans().map(f=>String(f.raw)),()=>String(S.fan),raw=>send({fan:raw},true),openFanPick);
@@ -1096,10 +1099,10 @@ function render(){
   const vOn=CAP&&CAP.vane?isSwingV(S.vane):!!S.vswing;$('airV').setAttribute('aria-pressed',vOn&&S.power);$('airVt').textContent=vOn?'נדנוד':(CAP&&CAP.vane?vaneLbl(S.vane):'קבוע');
   $('airH').setAttribute('aria-pressed',!!S.hswing&&S.power);$('airHt').textContent=S.hswing?'נדנוד':'קבוע';
   $('turboBtn').hidden=!turboMode();$('turboBtn').setAttribute('aria-pressed',turboOn()&&S.power);
-  $('bbModeIc').innerHTML=svg(m.ic);$('bbModeTxt').textContent=S.power?m.name:'כבוי';
+  $('bbModeIc').innerHTML=svg(m.ic);$('bbModeTxt').textContent=m.name;
   const fo=curFans().find(f=>String(f.raw)===String(S.fan));$('bbFan').hidden=!curFans().length;$('bbFanIc').innerHTML=fanLevelIc(S.fan);$('bbFanTxt').textContent=fo?fo.label:'—';
   const dots=(l,c)=>l.map(x=>`<i class="${x===c?'on':''}"></i>`).join('');
-  $('bbModeDots').innerHTML=dots(curModes().map(x=>x.id),S.power?S.mode:null);$('bbFanDots').innerHTML=dots(curFans().map(f=>String(f.raw)),String(S.fan));
+  $('bbModeDots').innerHTML=dots(curModes().map(x=>x.id),S.mode);$('bbFanDots').innerHTML=dots(curFans().map(f=>String(f.raw)),String(S.fan));
   $('bottomBar').style.gridTemplateColumns=curFans().length?'1fr 1fr':'1fr';
   tickTimer();
   document.querySelectorAll('#toggles [data-x]').forEach(b=>{const on=!!S['x_'+b.dataset.x];b.setAttribute('aria-pressed',on);const s=document.getElementById('sx_'+b.dataset.x);if(s)s.textContent=on?'פעיל':'כבוי'});
