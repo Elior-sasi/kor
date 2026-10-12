@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="4.3">
+<meta name="app-version" content="4.4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -391,6 +391,18 @@ html,body{height:100%;overflow:hidden}
 .prof{padding:9px 4px!important;gap:4px!important}
 .prof svg{width:20px!important;height:20px!important}
 .more summary{padding:13px 16px!important}
+/* 4.4 */
+.timer-line{display:inline-flex;align-items:center;gap:8px;padding:8px 16px!important}
+.timer-line svg{width:17px;height:17px;flex:0 0 auto}
+.timer-line svg:last-child{width:14px;height:14px;opacity:.6}
+.timer-line b{font-family:var(--f-num);font-weight:600;font-variant-numeric:tabular-nums;direction:ltr;min-width:4.2ch;text-align:center}
+.step{bottom:-2%!important}
+.step.minus{left:-1%!important}.step.plus{right:-1%!important}
+.hero{margin-bottom:-12px!important}
+.bb{gap:8px!important;padding:8px 12px!important}
+.bb-chev{display:none!important}
+.bb-t b{overflow:visible!important;text-overflow:clip!important}
+.bb-ic{width:32px!important;height:32px!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -742,6 +754,15 @@ function openTimer(){
 const timerLeftMin=()=>S.timerAt&&S.timerAt>Date.now()?Math.ceil((S.timerAt-Date.now())/60000):0;
 const timerLbl=()=>{const m=timerLeftMin();if(!m)return'';return m>=60?`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')} ש׳`:`${m} דק׳`};
 setInterval(()=>{if(document.visibilityState==='visible')render()},30000);
+const TIMER_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>';
+const EDIT_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>';
+function tickTimer(){const el=$('timerLine');if(!el)return;const ms=S.timerAt?S.timerAt-Date.now():0;
+  if(ms<=0){el.hidden=true;return}el.hidden=false;
+  const t=Math.ceil(ms/1000),h=Math.floor(t/3600),m=Math.floor(t%3600/60),sec=t%60;
+  const clock=(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(sec).padStart(2,'0');
+  const html=`${TIMER_IC}<span>${S.timerPower?'הדלקה בעוד':'כיבוי בעוד'}</span><b>${clock}</b>${EDIT_IC}`;
+  if(el.innerHTML!==html)el.innerHTML=html}
+setInterval(tickTimer,1000);
 
 /* ---------- sheets ---------- */
 function sheet(html,init){
@@ -1044,7 +1065,7 @@ function render(){
   const dots=(l,c)=>l.map(x=>`<i class="${x===c?'on':''}"></i>`).join('');
   $('bbModeDots').innerHTML=dots(curModes().map(x=>x.id),S.power?S.mode:null);$('bbFanDots').innerHTML=dots(curFans().map(f=>String(f.raw)),String(S.fan));
   $('bottomBar').style.gridTemplateColumns=curFans().length?'1fr 1fr':'1fr';
-  const tl=timerLbl();$('timerLine').hidden=!tl;if(tl)$('timerLine').textContent=(S.timerPower?'⏱ הדלקה בעוד ':'⏱ כיבוי בעוד ')+tl+' · שנה';
+  tickTimer();
   document.querySelectorAll('#toggles [data-x]').forEach(b=>{const on=!!S['x_'+b.dataset.x];b.setAttribute('aria-pressed',on);const s=document.getElementById('sx_'+b.dataset.x);if(s)s.textContent=on?'פעיל':'כבוי'});
   renderConn();
 }
