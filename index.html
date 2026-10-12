@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.3">
+<meta name="app-version" content="6.4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -1029,14 +1029,15 @@ async function openSchedules(){
       out.push({items:grp,time:esc(on.time)+(off?'<small>–'+esc(off.time)+'</small>':''),label:on.label.replace(RX,''),days:on.days,en:on.enabled})});
     return out};
   const render2=(el)=>{const R=rows();el._rows=R;
-    el.querySelector('#sl').innerHTML=R.length?R.map((r,i)=>`<div class="item${r.en?'':' off'}"><span class="tm">${r.time}</span><div class="grow"><b>${esc(r.label)}</b><span>${daysTxt(r.days)}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!r.en}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלקה כל יום ב-18:00 עד 23:00 על 24°.</p>';
+    el.querySelector('#sl').innerHTML=R.length?R.map((r,i)=>`<div class="item${r.en?'':' off'}" data-row="${i}" style="cursor:pointer"><span class="tm">${r.time}</span><div class="grow"><b>${esc(r.label)}</b><span>${daysTxt(r.days)}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!r.en}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלקה כל יום ב-18:00 עד 23:00 על 24°.</p>';
   };
   sheet(`<h3>תזמונים</h3><div class="list" id="sl"><p>טוען...</p></div>
-    <p>התזמונים רצים בשרת, גם כשהטלפון כבוי.</p>
+    <p>לחיצה על תזמון פותחת אותו לעריכה. התזמונים רצים בשרת, גם כשהטלפון כבוי.</p>
     <div class="row"><button class="btn" id="sx">סגור</button><button class="btn pri" id="sa">+ תזמון חדש</button></div>`,(el,close)=>{
     el.querySelector('#sx').onclick=close;el.querySelector('#sa').onclick=()=>openSchedEdit();
     el.querySelector('#sl').onclick=async e=>{
       const sw=e.target.closest('[data-sw]'),del=e.target.closest('[data-del]');
+      if(!sw&&!del){const it=e.target.closest('.item[data-row]');if(it){buzz();openSchedEdit(el._rows[it.dataset.row])}return}
       if(sw){const r=el._rows[sw.dataset.sw],v=!r.en;r.items.forEach(x=>x.enabled=v);render2(el);buzz();
         try{for(const x of r.items)await api('/schedules/save',Object.assign({device:DEV.id},x))}catch(err){r.items.forEach(x=>x.enabled=!v);render2(el);toast(netMsg(err))}}
       if(del){const r=el._rows[del.dataset.del];r.items.forEach(x=>SCHED.splice(SCHED.indexOf(x),1));render2(el);
@@ -1047,15 +1048,22 @@ async function openSchedules(){
   });
 }
 function loadExtrasLight(){const n=SCHED.filter(x=>x.enabled).length;EXTRA.sched=n?n+' פעילים':'אין'}
-function openSchedEdit(){
-  const st={kind:'on',time:'18:00',end:'23:00',mode:S.mode,temp:S.temp||24};
+function openSchedEdit(row){
+  const st={kind:'on',time:'18:00',end:'23:00',mode:S.mode,temp:S.temp||24,days:[0,1,2,3,4,5,6],en:true};
+  const isOn=x=>(x.cmds||[]).some(c=>CAP&&c.code===CAP.power&&c.value===true)||(!(x.cmds||[]).length&&!/^כבה/.test(x.label||''));
+  let oldOn=null,oldOff=null;
+  if(row){const it=row.items;oldOn=it.find(isOn)||null;oldOff=it.find(x=>x!==oldOn)||null;st.en=!!row.en;
+    if(oldOn&&oldOff){st.kind='range';st.end=oldOff.time}else if(!oldOn)st.kind='off';
+    const base=oldOn||oldOff;st.time=base.time;st.days=base.days||st.days;
+    (oldOn?oldOn.cmds||[]:[]).forEach(c=>{if(CAP&&CAP.mode&&c.code===CAP.mode.code&&CAP.mode.fromRaw[c.value])st.mode=CAP.mode.fromRaw[c.value];
+      if(CAP&&CAP.temp&&c.code===CAP.temp.code)st.temp=c.value/10**CAP.temp.scale})}
   const modes=CAP&&CAP.mode&&Object.keys(CAP.mode.toRaw).length?MODES.filter(m=>m.id in CAP.mode.toRaw):MODES;
   const temps=Array.from({length:Math.round((tmax()-tmin())/tstep())+1},(_,i)=>tmin()+i*tstep());
-  sheet(`<h3>תזמון חדש</h3>
-    <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="true">הדלקה</button><button class="chip" data-k="off" aria-pressed="false">כיבוי</button><button class="chip" data-k="range" aria-pressed="false">הדלקה עד שעה</button></div>
-    <div class="trow"><div class="field"><label for="stime" id="stl">שעה</label><input type="time" id="stime" value="${st.time}"></div><div class="field" id="sendF" hidden><label for="send">כיבוי</label><input type="time" id="send" value="${st.end}"></div></div>
-    <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="true">${d}</button>`).join('')}</div></div>
-    <div id="sOnOpts" style="display:flex;flex-direction:column;gap:14px">
+  sheet(`<h3>${row?'עריכת תזמון':'תזמון חדש'}</h3>
+    <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="${st.kind==='on'}">הדלקה</button><button class="chip" data-k="off" aria-pressed="${st.kind==='off'}">כיבוי</button><button class="chip" data-k="range" aria-pressed="${st.kind==='range'}">הדלקה עד שעה</button></div>
+    <div class="trow"><div class="field"><label for="stime" id="stl">${st.kind==='range'?'הדלקה':'שעה'}</label><input type="time" id="stime" value="${st.time}"></div><div class="field" id="sendF"${st.kind==='range'?'':' hidden'}><label for="send">כיבוי</label><input type="time" id="send" value="${st.end}"></div></div>
+    <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="${st.days.includes(i)}">${d}</button>`).join('')}</div></div>
+    <div id="sOnOpts" style="display:${st.kind==='off'?'none':'flex'};flex-direction:column;gap:14px">
       <div class="field"><label>מצב</label><div class="chips one" id="smode">${modes.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${m.id===st.mode}">${m.name}</button>`).join('')}</div></div>
       <div class="tstep"><label>טמפרטורה</label><div class="ctl"><button id="stp" aria-label="יותר">+</button><b id="stv">${st.temp}°</b><button id="stm" aria-label="פחות">−</button></div></div>
     </div>
@@ -1077,12 +1085,14 @@ function openSchedEdit(){
       const on={power:true,mode:st.mode,temp:st.temp};
       const b=q('#ss');b.disabled=true;b.textContent='שומר...';
       try{
-        if(st.kind==='off')await api('/schedules/save',{device:DEV.id,time,days,cmds:toCommands({power:false}),label:'כבה',enabled:true});
-        else if(st.kind==='on')await api('/schedules/save',{device:DEV.id,time,days,cmds:toCommands(on),label:actionLabel(on),enabled:true});
-        else{const g=Math.random().toString(36).slice(2,8);
-          const offDays=end<time?days.map(d=>(d+1)%7):days;
-          await api('/schedules/save',{device:DEV.id,time,days,cmds:toCommands(on),label:actionLabel(on)+' #r:'+g,enabled:true});
-          await api('/schedules/save',{device:DEV.id,time:end,days:offDays,cmds:toCommands({power:false}),label:'כבה #r:'+g,enabled:true})}
+        const g=Math.random().toString(36).slice(2,8),en=st.en,list=[];
+        if(st.kind==='off')list.push({time,days,cmds:toCommands({power:false}),label:'כבה',old:oldOff||oldOn});
+        else if(st.kind==='on')list.push({time,days,cmds:toCommands(on),label:actionLabel(on),old:oldOn||oldOff});
+        else{list.push({time,days,cmds:toCommands(on),label:actionLabel(on)+' #r:'+g,old:oldOn});
+          list.push({time:end,days:end<time?days.map(d=>(d+1)%7):days,cmds:toCommands({power:false}),label:'כבה #r:'+g,old:oldOff})}
+        const used=new Set();
+        for(const x of list){const o=x.old;delete x.old;const body={device:DEV.id,enabled:en,...x};if(o){body.id=o.id;used.add(o.id)}await api('/schedules/save',body)}
+        for(const o of [oldOn,oldOff])if(o&&!used.has(o.id))await api('/schedules/delete',{id:o.id});
         toast('התזמון נשמר');openSchedules()}
       catch(err){q('#serr').textContent=netMsg(err);b.disabled=false;b.textContent='שמור'}
     };
