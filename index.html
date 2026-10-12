@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.2">
+<meta name="app-version" content="6.3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -97,6 +97,24 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .btn.pri{background:var(--accent);color:#06121b;border:0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:13.5px;z-index:20;direction:rtl;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* 6.3 sheets without scroll */
+.sheet{max-height:calc(100dvh - env(safe-area-inset-top,0px) - 14px);overscroll-behavior:contain;gap:14px}
+.sheet{overflow-x:hidden!important;touch-action:pan-y}
+.sheet.fits{overflow-y:hidden}
+.alist .grow{min-width:0}.alist b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet .field{gap:5px}
+.seg3{display:flex;gap:6px}.seg3 .chip{flex:1;padding:9px 4px;text-align:center}
+.chips.one{flex-wrap:nowrap}.chips.one .chip{flex:1 1 0;min-width:0;padding:8px 2px;text-align:center}
+.trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.trow:has(#sendF:not([hidden])) input{font-size:18px!important;padding-inline:10px!important}
+.tstep{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tstep label{font-size:13px;color:var(--muted)}
+.tstep .ctl{display:flex;align-items:center;gap:6px}
+.tstep .ctl b{font-family:var(--f-num);font-size:22px;font-weight:400;min-width:52px;text-align:center;direction:ltr}
+.tstep .ctl button{width:40px;height:36px;border-radius:12px;background:var(--fill-2);font-size:20px;line-height:1}
+.item .tm small{font-size:15px;color:var(--muted)}
+.alist{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.alist .item{padding:10px 10px 10px 12px;gap:8px}.alist .item b{font-size:14px}
+.alist .icon-btn{width:32px;height:32px}
 </style>
 <style>
 .pill{cursor:pointer}
@@ -844,7 +862,11 @@ function sheet(html,init){
   sh.addEventListener('touchstart',e=>{if(sh.scrollTop>0||e.target.closest('.wheel'))return;y0=e.touches[0].clientY;dy=0;sh.style.transition='none'},{passive:true});
   sh.addEventListener('touchmove',e=>{if(y0===null)return;dy=Math.max(0,e.touches[0].clientY-y0);if(dy>0)sh.style.transform=`translateY(${dy}px)`},{passive:true});
   sh.addEventListener('touchend',()=>{if(y0===null)return;y0=null;if(dy>90)close();else{sh.style.transition='transform .2s';sh.style.transform=''}});
-  init&&init(sc.querySelector('.sheet'),close);return close;
+  sh.addEventListener('touchmove',e=>{if(sh.classList.contains('fits')&&e.cancelable&&!e.target.closest('.wheel'))e.preventDefault()},{passive:false});
+  const fit=()=>sh.classList.toggle('fits',sh.scrollHeight<=sh.clientHeight+1);
+  init&&init(sc.querySelector('.sheet'),close);fit();
+  try{new MutationObserver(()=>requestAnimationFrame(fit)).observe(sh,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']})}catch(e){}
+  addEventListener('resize',fit);return close;
 }
 function openConnect(){
   sheet(`<h3>חיבור למזגן</h3>
@@ -997,8 +1019,17 @@ try{if(localStorage.getItem('kor_more')==='1')$('moreDet').open=true}catch(e){}
 $('moreDet').addEventListener('toggle',()=>{try{localStorage.setItem('kor_more',$('moreDet').open?'1':'0')}catch(e){}});
 
 async function openSchedules(){
-  const render2=(el)=>{
-    el.querySelector('#sl').innerHTML=SCHED.length?SCHED.map((x,i)=>`<div class="item${x.enabled?'':' off'}"><span class="tm">${esc(x.time)}</span><div class="grow"><b>${esc(x.label||'')}</b><span>${daysTxt(x.days)}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!x.enabled}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלק כל יום ב-18:00 על 24°, או כבה כל לילה ב-02:00.</p>';
+  const RX=/\s#r:(\w+)$/;
+  const rows=()=>{const out=[],seen={};
+    SCHED.forEach(x=>{const m=(x.label||'').match(RX);
+      if(!m){out.push({items:[x],time:esc(x.time),label:x.label||'',days:x.days,en:x.enabled});return}
+      if(seen[m[1]])return;seen[m[1]]=1;
+      const grp=SCHED.filter(y=>(y.label||'').match(RX)?.[1]===m[1]);
+      const on=grp.find(y=>!/^כבה/.test(y.label))||grp[0],off=grp.find(y=>y!==on);
+      out.push({items:grp,time:esc(on.time)+(off?'<small>–'+esc(off.time)+'</small>':''),label:on.label.replace(RX,''),days:on.days,en:on.enabled})});
+    return out};
+  const render2=(el)=>{const R=rows();el._rows=R;
+    el.querySelector('#sl').innerHTML=R.length?R.map((r,i)=>`<div class="item${r.en?'':' off'}"><span class="tm">${r.time}</span><div class="grow"><b>${esc(r.label)}</b><span>${daysTxt(r.days)}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!r.en}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלקה כל יום ב-18:00 עד 23:00 על 24°.</p>';
   };
   sheet(`<h3>תזמונים</h3><div class="list" id="sl"><p>טוען...</p></div>
     <p>התזמונים רצים בשרת, גם כשהטלפון כבוי.</p>
@@ -1006,10 +1037,10 @@ async function openSchedules(){
     el.querySelector('#sx').onclick=close;el.querySelector('#sa').onclick=()=>openSchedEdit();
     el.querySelector('#sl').onclick=async e=>{
       const sw=e.target.closest('[data-sw]'),del=e.target.closest('[data-del]');
-      if(sw){const x=SCHED[sw.dataset.sw];x.enabled=!x.enabled;render2(el);buzz();
-        try{await api('/schedules/save',Object.assign({device:DEV.id},x))}catch(err){x.enabled=!x.enabled;render2(el);toast(netMsg(err))}}
-      if(del){const x=SCHED[del.dataset.del];SCHED.splice(del.dataset.del,1);render2(el);
-        try{await api('/schedules/delete',{id:x.id});toast('נמחק')}catch(err){toast(netMsg(err))}}
+      if(sw){const r=el._rows[sw.dataset.sw],v=!r.en;r.items.forEach(x=>x.enabled=v);render2(el);buzz();
+        try{for(const x of r.items)await api('/schedules/save',Object.assign({device:DEV.id},x))}catch(err){r.items.forEach(x=>x.enabled=!v);render2(el);toast(netMsg(err))}}
+      if(del){const r=el._rows[del.dataset.del];r.items.forEach(x=>SCHED.splice(SCHED.indexOf(x),1));render2(el);
+        try{for(const x of r.items)await api('/schedules/delete',{id:x.id});toast('נמחק')}catch(err){toast(netMsg(err))}}
       loadExtrasLight();
     };
     loadExtras().then(()=>render2(el));
@@ -1017,34 +1048,43 @@ async function openSchedules(){
 }
 function loadExtrasLight(){const n=SCHED.filter(x=>x.enabled).length;EXTRA.sched=n?n+' פעילים':'אין'}
 function openSchedEdit(){
-  const st={time:'18:00',days:[0,1,2,3,4,5,6],power:true,mode:S.mode,temp:S.temp||24};
+  const st={kind:'on',time:'18:00',end:'23:00',mode:S.mode,temp:S.temp||24};
   const modes=CAP&&CAP.mode&&Object.keys(CAP.mode.toRaw).length?MODES.filter(m=>m.id in CAP.mode.toRaw):MODES;
+  const temps=Array.from({length:Math.round((tmax()-tmin())/tstep())+1},(_,i)=>tmin()+i*tstep());
   sheet(`<h3>תזמון חדש</h3>
-    <div class="field"><label for="stime">שעה</label><input type="time" id="stime" value="${st.time}"></div>
-    <div class="field"><label>ימים</label><div class="chips" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="true">${d}</button>`).join('')}</div></div>
-    <div class="field"><label>פעולה</label><div class="chips" id="spow"><button class="chip" data-p="1" aria-pressed="true">הדלק</button><button class="chip" data-p="0" aria-pressed="false">כבה</button></div></div>
-    <div id="sOnOpts">
-      <div class="field"><label>מצב</label><div class="chips" id="smode">${modes.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${m.id===st.mode}">${m.name}</button>`).join('')}</div></div>
-      <div class="field"><label for="stemp">טמפרטורה</label><select id="stemp">${Array.from({length:Math.round((tmax()-tmin())/tstep())+1},(_,i)=>tmin()+i*tstep()).map(t=>`<option value="${t}"${t===st.temp?' selected':''}>${t}°</option>`).join('')}</select></div>
+    <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="true">הדלקה</button><button class="chip" data-k="off" aria-pressed="false">כיבוי</button><button class="chip" data-k="range" aria-pressed="false">הדלקה עד שעה</button></div>
+    <div class="trow"><div class="field"><label for="stime" id="stl">שעה</label><input type="time" id="stime" value="${st.time}"></div><div class="field" id="sendF" hidden><label for="send">כיבוי</label><input type="time" id="send" value="${st.end}"></div></div>
+    <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="true">${d}</button>`).join('')}</div></div>
+    <div id="sOnOpts" style="display:flex;flex-direction:column;gap:14px">
+      <div class="field"><label>מצב</label><div class="chips one" id="smode">${modes.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${m.id===st.mode}">${m.name}</button>`).join('')}</div></div>
+      <div class="tstep"><label>טמפרטורה</label><div class="ctl"><button id="stp" aria-label="יותר">+</button><b id="stv">${st.temp}°</b><button id="stm" aria-label="פחות">−</button></div></div>
     </div>
     <div class="err-msg" id="serr"></div>
     <div class="row"><button class="btn" id="sb">ביטול</button><button class="btn pri" id="ss">שמור</button></div>`,(el,close)=>{
-    const tog=(sel,attr,single)=>el.querySelector(sel).onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();
-      if(single)el.querySelectorAll(sel+' .chip').forEach(c=>c.setAttribute('aria-pressed',c===b));else b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true');
-      if(sel==='#spow')el.querySelector('#sOnOpts').hidden=b.dataset.p==='0'};
-    tog('#sdays','d',false);tog('#spow','p',true);tog('#smode','m',true);
-    el.querySelector('#sb').onclick=openSchedules;
-    el.querySelector('#ss').onclick=async()=>{
-      const time=el.querySelector('#stime').value;
+    const q=x=>el.querySelector(x);
+    const one=(sel,fn)=>q(sel).onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();el.querySelectorAll(sel+' .chip').forEach(c=>c.setAttribute('aria-pressed',c===b));fn&&fn(b)};
+    one('#skind',b=>{st.kind=b.dataset.k;q('#sOnOpts').style.display=st.kind==='off'?'none':'flex';q('#sendF').hidden=st.kind!=='range';q('#stl').textContent=st.kind==='range'?'הדלקה':'שעה'});
+    one('#smode',b=>st.mode=b.dataset.m);
+    q('#sdays').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true')};
+    const tset=d=>{let i=temps.indexOf(st.temp);if(i<0)i=temps.findIndex(t=>t>=st.temp);st.temp=temps[Math.max(0,Math.min(temps.length-1,i+d))];q('#stv').textContent=st.temp+'°';buzz()};
+    q('#stm').onclick=()=>tset(-1);q('#stp').onclick=()=>tset(1);
+    q('#sb').onclick=openSchedules;
+    q('#ss').onclick=async()=>{
+      const time=q('#stime').value,end=q('#send').value;
       const days=[...el.querySelectorAll('#sdays .chip[aria-pressed="true"]')].map(b=>+b.dataset.d);
-      const power=el.querySelector('#spow .chip[aria-pressed="true"]').dataset.p==='1';
-      if(!time||!days.length){el.querySelector('#serr').textContent='בחר שעה ולפחות יום אחד';return}
-      const a={power};
-      if(power){const mb=el.querySelector('#smode .chip[aria-pressed="true"]');if(mb)a.mode=mb.dataset.m;a.temp=+el.querySelector('#stemp').value}
-      const cmds=toCommands(a);
-      const b=el.querySelector('#ss');b.disabled=true;b.textContent='שומר...';
-      try{await api('/schedules/save',{device:DEV.id,time,days,cmds,label:actionLabel(a),enabled:true});toast('התזמון נשמר');openSchedules()}
-      catch(err){el.querySelector('#serr').textContent=netMsg(err);b.disabled=false;b.textContent='שמור'}
+      if(!time||!days.length){q('#serr').textContent='בחר שעה ולפחות יום אחד';return}
+      if(st.kind==='range'&&(!end||end===time)){q('#serr').textContent='בחר שעת כיבוי שונה משעת ההדלקה';return}
+      const on={power:true,mode:st.mode,temp:st.temp};
+      const b=q('#ss');b.disabled=true;b.textContent='שומר...';
+      try{
+        if(st.kind==='off')await api('/schedules/save',{device:DEV.id,time,days,cmds:toCommands({power:false}),label:'כבה',enabled:true});
+        else if(st.kind==='on')await api('/schedules/save',{device:DEV.id,time,days,cmds:toCommands(on),label:actionLabel(on),enabled:true});
+        else{const g=Math.random().toString(36).slice(2,8);
+          const offDays=end<time?days.map(d=>(d+1)%7):days;
+          await api('/schedules/save',{device:DEV.id,time,days,cmds:toCommands(on),label:actionLabel(on)+' #r:'+g,enabled:true});
+          await api('/schedules/save',{device:DEV.id,time:end,days:offDays,cmds:toCommands({power:false}),label:'כבה #r:'+g,enabled:true})}
+        toast('התזמון נשמר');openSchedules()}
+      catch(err){q('#serr').textContent=netMsg(err);b.disabled=false;b.textContent='שמור'}
     };
   });
 }
@@ -1062,12 +1102,11 @@ async function openSiri(renew){
     ...PROFILES.map(p=>({n:'מזגן '+p.n,u:mk(p.s,'פרופיל '+p.n+' הופעל')}))
   ];
   sheet(`<h3>Siri ומיקום</h3>
-    <div class="hint"><b>Siri:</b> אפליקציית <b>קיצורים</b> ← <b>+</b> ← הוסף פעולה <b>"קבל תוכן של URL"</b> ← הדבק קישור ← תן לקיצור שם, למשל <b>"הדלק מזגן"</b>. מעכשיו: "היי סירי, הדלק מזגן".</div>
-    <div class="hint"><b>לפי מיקום:</b> קיצורים ← <b>אוטומציה</b> ← <b>+</b> ← <b>הגעה</b> ← בחר <b>בית</b> ← <b>הפעל מיד</b> ← <b>"קבל תוכן של URL"</b> ← הדבק את קישור "הדלק מזגן". אפשר גם <b>יציאה</b> עם "כבה מזגן".</div>
-    <div class="list" id="al">${acts.map((a,i)=>`<div class="item"><div class="grow"><b>${esc(a.n)}</b><span>קישור לקיצור</span></div><button class="icon-btn" data-cp="${i}" aria-label="העתק">${ICON_COPY}</button></div>`).join('')}</div>
-    <input id="cpbox" readonly style="position:absolute;left:-9999px">
-    <p>הקישורים פותחים את המזגן בלי סיסמה. אל תשתף אותם.</p>
-    <div class="row"><button class="btn" id="ar">צור קישורים חדשים</button><button class="btn pri" id="ax">סגור</button></div>`,(el,close)=>{
+    <div class="hint"><b>Siri:</b> אפליקציית קיצורים ← <b>+</b> ← <b>"קבל תוכן של URL"</b> ← הדבק קישור ← תן שם, למשל "הדלק מזגן".<br><b>לפי מיקום:</b> קיצורים ← אוטומציה ← <b>הגעה</b>/<b>יציאה</b> ← בית ← הפעל מיד ← אותה פעולה.</div>
+    <div class="alist" id="al">${acts.map((a,i)=>`<div class="item"><div class="grow"><b>${esc(a.n)}</b></div><button class="icon-btn" data-cp="${i}" aria-label="העתק">${ICON_COPY}</button></div>`).join('')}</div>
+    <input id="cpbox" readonly tabindex="-1" aria-hidden="true" style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;font-size:16px">
+    <p style="font-size:12.5px">הקישורים פותחים את המזגן בלי סיסמה. אל תשתף אותם.</p>
+    <div class="row"><button class="btn" id="ar">קישורים חדשים</button><button class="btn pri" id="ax">סגור</button></div>`,(el,close)=>{
     el.querySelector('#ax').onclick=close;
     el.querySelector('#ar').onclick=()=>openSiri(true);
     el.querySelector('#al').onclick=e=>{const b=e.target.closest('[data-cp]');if(!b)return;const u=acts[b.dataset.cp].u;buzz();
