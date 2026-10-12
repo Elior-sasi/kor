@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="7.0">
+<meta name="app-version" content="7.1">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -311,6 +311,8 @@ button:active{transform:scale(.96)}
 .pill.only-dot{padding:0;width:40px;height:40px;justify-content:center}
 .pill.only-dot #connTxt{display:none}
 .pill.only-dot .dot{width:10px;height:10px;box-shadow:0 0 8px var(--ok)}
+.pill.only-dot .dot:not(.on){box-shadow:0 0 8px var(--warn);animation:dotPulse 1.2s ease-in-out infinite}
+@keyframes dotPulse{50%{opacity:.35}}
 .hero{margin-bottom:-26px}
 .tick{opacity:.35}
 .app.is-off .temp{color:rgba(255,255,255,.28)!important}
@@ -1166,7 +1168,7 @@ let tt;function toast(m){document.querySelector('.toast')?.remove();const t=docu
 /* ---------- render ---------- */
 function renderConn(){
   const map={off:['','לא מחובר'],wait:['','מתחבר...'],on:['on','מחובר'],offline:['err','המזגן לא ברשת'],err:['err','שגיאת חיבור']};
-  const[c,t]=map[connState]||map.off;$('connDot').className='dot '+c;$('connTxt').textContent=t;$('conn').classList.toggle('only-dot',connState==='on');$('conn').setAttribute('aria-label',t);
+  const[c,t]=map[connState]||map.off;$('connDot').className='dot '+c;$('connTxt').textContent=t;$('conn').classList.toggle('only-dot',connState==='on'||connState==='wait');$('conn').setAttribute('aria-label',t);
 }
 function render(){
   const m=MODES.find(x=>x.id===S.mode)||MODES[0];
