@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.9">
+<meta name="app-version" content="7.0">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -108,7 +108,12 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .seg3{display:flex;gap:6px}.seg3 .chip{flex:1;padding:10px 4px;text-align:center;white-space:nowrap}
 .trow input{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;text-align:center;max-width:100%}
 .chips.one{flex-wrap:nowrap}.chips.one .chip{flex:1 1 0;min-width:0;padding:8px 2px;text-align:center}
-.trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.trow input{height:52px!important;font-size:20px!important;padding:0 10px!important;line-height:52px}
+.trow{display:flex;gap:8px}.trow .field{flex:1;min-width:0}.trow input{width:100%;min-width:0}.tpair{display:flex;flex-direction:column;gap:8px}
+.trow2{display:flex;align-items:center;gap:12px;padding:8px 8px 8px 14px;border-radius:18px;background:var(--fill-2)}
+.trow2 label{flex:1;font-size:16px;color:var(--fg)}
+.sheet .trow2 input[type=time]{width:150px;height:auto!important;font-size:24px!important;padding:8px 6px!important;text-align:center;-webkit-appearance:none;appearance:none;display:flex;align-items:center;justify-content:center;background:var(--fill)!important;border:0}
+.sheet .trow2 input[type=time]::-webkit-date-and-time-value{text-align:center;margin:0}
+.trow2.dis input,.trow2.dis label{opacity:.35}
 .tstep{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tstep label{font-size:13px;color:var(--muted)}
 .tstep .ctl{display:flex;align-items:center;gap:6px}
@@ -1066,8 +1071,10 @@ function openSchedEdit(row){
   const modes=CAP&&CAP.mode&&Object.keys(CAP.mode.toRaw).length?MODES.filter(m=>m.id in CAP.mode.toRaw):MODES;
   const temps=Array.from({length:Math.round((tmax()-tmin())/tstep())+1},(_,i)=>tmin()+i*tstep());
   sheet(`<h3>${row?'עריכת תזמון':'תזמון חדש'}</h3>
-    <div class="seg3" id="skind"><button class="chip" data-k="on" aria-pressed="${st.kind==='on'}">הדלקה</button><button class="chip" data-k="off" aria-pressed="${st.kind==='off'}">כיבוי</button><button class="chip" data-k="range" aria-pressed="${st.kind==='range'}">טווח שעות</button></div>
-    <div class="trow"><div class="field"><label for="stime" id="stl">${st.kind==='range'?'הדלקה':'שעה'}</label><input type="time" id="stime" value="${st.time}"></div><div class="field" id="sendF"${st.kind==='range'?'':' hidden'}><label for="send">כיבוי</label><input type="time" id="send" value="${st.end}"></div></div>
+    <div class="tpair">
+      <div class="trow2${st.kind==='off'?' dis':''}" id="rOn"><button class="sw" id="swOn" aria-pressed="${st.kind!=='off'}" aria-label="הדלקה"></button><label for="stime">הדלקה</label><input type="time" id="stime" value="${st.time}"></div>
+      <div class="trow2${st.kind==='on'?' dis':''}" id="rOff"><button class="sw" id="swOff" aria-pressed="${st.kind!=='on'}" aria-label="כיבוי"></button><label for="send">כיבוי</label><input type="time" id="send" value="${st.kind==='off'?st.time:st.end}"></div>
+    </div>
     <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="${st.days.includes(i)}">${d}</button>`).join('')}</div></div>
     <div id="sOnOpts" style="visibility:${st.kind==='off'?'hidden':'visible'};display:flex;flex-direction:column;gap:14px">
       <div class="field"><label>מצב</label><div class="chips one" id="smode">${modes.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${m.id===st.mode}">${m.name}</button>`).join('')}</div></div>
@@ -1077,17 +1084,22 @@ function openSchedEdit(row){
     <div class="row"><button class="btn" id="sb">ביטול</button><button class="btn pri" id="ss">שמור</button></div>`,(el,close)=>{
     const q=x=>el.querySelector(x);
     const one=(sel,fn)=>q(sel).onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();el.querySelectorAll(sel+' .chip').forEach(c=>c.setAttribute('aria-pressed',c===b));fn&&fn(b)};
-    one('#skind',b=>{st.kind=b.dataset.k;q('#sOnOpts').style.visibility=st.kind==='off'?'hidden':'visible';q('#sendF').hidden=st.kind!=='range';q('#stl').textContent=st.kind==='range'?'הדלקה':'שעה'});
+    const kindSync=()=>{const on=q('#swOn').getAttribute('aria-pressed')==='true',off=q('#swOff').getAttribute('aria-pressed')==='true';
+      st.kind=on&&off?'range':on?'on':'off';q('#rOn').classList.toggle('dis',!on);q('#rOff').classList.toggle('dis',!off);q('#sOnOpts').style.visibility=on?'visible':'hidden'};
+    const swT=(id,other)=>{q(id).onclick=()=>{buzz();const v=q(id).getAttribute('aria-pressed')!=='true';q(id).setAttribute('aria-pressed',v);if(!v&&q(other).getAttribute('aria-pressed')!=='true')q(other).setAttribute('aria-pressed','true');kindSync()}};
+    swT('#swOn','#swOff');swT('#swOff','#swOn');
+    q('#rOn').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON'&&q('#rOn').classList.contains('dis')){q('#swOn').click()}});
+    q('#rOff').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON'&&q('#rOff').classList.contains('dis')){q('#swOff').click()}});
     one('#smode',b=>st.mode=b.dataset.m);
     q('#sdays').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')!=='true')};
     const tset=d=>{let i=temps.indexOf(st.temp);if(i<0)i=temps.findIndex(t=>t>=st.temp);st.temp=temps[Math.max(0,Math.min(temps.length-1,i+d))];q('#stv').textContent=st.temp+'°';buzz()};
     q('#stm').onclick=()=>tset(-1);q('#stp').onclick=()=>tset(1);
     q('#sb').onclick=openSchedules;
     q('#ss').onclick=async()=>{
-      const time=q('#stime').value,end=q('#send').value;
+      let time=q('#stime').value,end=q('#send').value;if(st.kind==='off')time=end;
       const days=[...el.querySelectorAll('#sdays .chip[aria-pressed="true"]')].map(b=>+b.dataset.d);
       if(!time||!days.length){q('#serr').textContent='בחר שעה ולפחות יום אחד';return}
-      if(st.kind==='range'&&(!end||end===time)){q('#serr').textContent='בחר שעת כיבוי שונה משעת ההדלקה';return}
+      if(st.kind==='range'&&(!end||end===time)){q('#serr').textContent='שעת הכיבוי צריכה להיות שונה משעת ההדלקה';return}
       const on={power:true,mode:st.mode,temp:st.temp};
       const b=q('#ss');b.disabled=true;b.textContent='שומר...';
       try{
