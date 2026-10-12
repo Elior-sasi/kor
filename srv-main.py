@@ -15,6 +15,7 @@ import datetime as dt
 import hashlib
 import hmac
 import json
+import re
 import os
 import secrets
 import time
@@ -504,6 +505,51 @@ def _route(req, path: str, body: dict):
         days = [s2.to_dict() for s2 in _db().collection("kor_stats").where("sess", "==", ref.id).stream()]
         days.sort(key=lambda x: x.get("date", ""), reverse=True)
         return {"days": days[:31]}
+    if path == "/debug":
+        did = body.get("id", "")
+        out = {"mode": sess["mode"]}
+        def tryget(name, fn):
+            try:
+                out[name] = fn()
+            except Exception as e:  # noqa: BLE001
+                out[name] = "ERR " + str(e)[:300]
+        if sess["mode"] == "share":
+            api = _share_api(sess, ref)
+            g = lambda p, q=None: api.get(p, q)  # noqa: E731
+            tryget("detail", lambda: g("/v1.0/m/life/ha/devices/detail", {"devIds": did}))
+            tryget("spec", lambda: g(f"/v1.1/m/life/{did}/specifications"))
+            tryget("model", lambda: g(f"/v1.0/m/thing/{did}/model"))
+            tryget("model2", lambda: g(f"/v2.0/m/thing/{did}/model"))
+            tryget("props", lambda: g(f"/v2.0/m/thing/{did}/shadow/properties"))
+            tryget("props1", lambda: g(f"/v1.0/m/thing/{did}/shadow/properties"))
+        else:
+            d = sess["dev"]
+            tryget("info", lambda: _dev_call(d, "GET", f"/v1.0/devices/{did}"))
+            tryget("spec", lambda: _dev_call(d, "GET", f"/v1.0/iot-03/devices/{did}/specification"))
+            tryget("model", lambda: _dev_call(d, "GET", f"/v2.0/cloud/thing/{did}/model"))
+            tryget("props", lambda: _dev_call(d, "GET", f"/v2.0/cloud/thing/{did}/shadow/properties"))
+        txt = json.dumps(out, ensure_ascii=False)
+        for k in ("local_key", "localKey", "uuid", "ip", "lat", "lon"):
+            txt = re.sub(r'"%s"\s*:\s*"[^"]*"' % k, '"%s":"-"' % k, txt)
+        return json.loads(txt)
+    if path == "/probe":
+        did = body.get("id", "")
+        try:
+            if body.get("props") is not None:
+                props = json.dumps(body["props"])
+                if sess["mode"] == "share":
+                    r = _share_api(sess, ref).post(f"/v2.0/m/thing/{did}/shadow/properties/issue", None, {"properties": props})
+                else:
+                    r = _dev_call(sess["dev"], "POST", f"/v2.0/cloud/thing/{did}/shadow/properties/issue", {"properties": props})
+            else:
+                cmds = body.get("commands") or []
+                if sess["mode"] == "share":
+                    r = _share_api(sess, ref).post(f"/v1.1/m/thing/{did}/commands", None, {"commands": cmds})
+                else:
+                    r = _dev_call(sess["dev"], "POST", f"/v1.0/iot-03/devices/{did}/commands", {"commands": cmds})
+            return {"resp": r}
+        except Exception as e:  # noqa: BLE001
+            return {"resp": "ERR " + str(e)[:300]}
     if path == "/devices":
         return {"mode": sess["mode"], "devices": _devices(sess, ref)}
     if path == "/device":

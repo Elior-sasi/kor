@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="7.4">
+<meta name="app-version" content="7.5">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -981,13 +981,22 @@ function actionLabel(a){if(!a.power)return'כבה';const m=MODES.find(x=>x.id===
 const setTxt=(id,t)=>{const e=document.getElementById(id);if(e)e.textContent=t};
 const MI={sched:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 14v3l2 1"/>',siri:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',conn:'<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'};
 let EXTRA={sched:'',stats:''};
+async function openDiag(){
+  const close0=sheet('<h3>בדיקת צפצוף</h3><p>אוסף נתונים מהמזגן...</p>');
+  let j;try{j=await api('/debug',{id:DEV.id})}catch(e){close0();return toast(netMsg(e)+(String(e).includes('404')||String(e).includes('לא נמצא')?' - צריך לעדכן את השרת':''))}
+  const txt=JSON.stringify(j);
+  sheet(`<h3>בדיקת צפצוף</h3><p>הנתונים מוכנים. העתק ושלח לי בצ'אט.</p><textarea id="dg" readonly style="width:100%;height:160px;direction:ltr;font-size:11px;background:var(--fill-2);color:var(--fg);border:0;border-radius:12px;padding:10px;box-sizing:border-box">${esc(txt)}</textarea><div class="row"><button class="btn pri" id="dc">העתק</button></div>`,(el)=>{
+    el.querySelector('#dc').onclick=()=>{const t=el.querySelector('#dg');buzz();
+      const fb=()=>{t.select();try{document.execCommand('copy');toast('הועתק')}catch(e){toast('סמן והעתק ידנית')}};
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(()=>toast('הועתק'),fb);else fb()}});
+}
 function openMenu(){
   const row=(id,ic,t,sub)=>`<button class="item" data-go="${id}">${svg(ic)}<div class="grow"><b>${t}</b><span>${sub||''}</span></div></button>`;
   sheet(`<h3>תפריט</h3><div class="menu-list">
     ${linked&&CAP?row('timer',MI.timer,'טיימר',timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל')+row('sched',MI.sched,'תזמונים',EXTRA.sched)+row('siri',MI.siri,'Siri ומיקום','קיצורי דרך')+row('stats',MI.stats,'סטטיסטיקה',EXTRA.stats):''}
-    ${row('conn',MI.conn,'החיבור',linked?'מחובר':'לא מחובר')}
+    ${row('conn',MI.conn,'החיבור',linked?'מחובר':'לא מחובר')}${linked&&DEV?row('diag',MI.stats,'בדיקת צפצוף','אבחון זמני'):''}
   </div><p style="text-align:center;font-size:12px;margin-top:4px">Breeze ${(document.querySelector('meta[name="app-version"]')||{}).content||''}</p>`,(el,close)=>{el.querySelector('.menu-list').onclick=e=>{const b=e.target.closest('[data-go]');if(!b)return;buzz();
-    ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
+    ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,diag:openDiag,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
 }
 $('menuBtn').onclick=openMenu;
 const isSwingV=v=>/^(auto|swing|all|full)$/i.test(String(v));
