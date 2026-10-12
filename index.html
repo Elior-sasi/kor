@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="6.5">
+<meta name="app-version" content="6.6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -709,9 +709,11 @@ function setDevice(d){
   connState=d.online?'on':'offline';buildControls();render();
   api('/prefs',{device:d.id}).catch(()=>{});loadExtras();setTimeout(maybeHint,1500);
 }
-let SCHED=[];
+let SCHED=[],SCHED_OK=false;
+try{const c=JSON.parse(localStorage.getItem('kor_sched')||'null');if(Array.isArray(c)){SCHED=c;SCHED_OK=true}}catch(e){}
+async function loadSched(){const j=await api('/schedules');SCHED=j.schedules||[];SCHED_OK=true;try{localStorage.setItem('kor_sched',JSON.stringify(SCHED))}catch(e){}return j}
 async function loadExtras(){
-  try{const j=await api('/schedules');SCHED=j.schedules||[];
+  try{const j=await loadSched();
     if(j.timer){S.timerAt=j.timer.at*1000;S.timerPower=j.timer.power}else{S.timerAt=0}
     const n=SCHED.filter(x=>x.enabled).length;EXTRA.sched=n?n+' פעילים':'אין';render()}catch(e){}
   try{const j=await api('/stats');const t=(j.days||[]).find(d=>d.date===ymd(new Date()));EXTRA.stats='היום '+hrs(t?t.minutes:0)}catch(e){}
@@ -1033,7 +1035,7 @@ async function openSchedules(){
   const render2=(el)=>{const R=rows();el._rows=R;
     el.querySelector('#sl').innerHTML=R.length?R.map((r,i)=>`<div class="item${r.en?'':' off'}" data-row="${i}" style="cursor:pointer"><span class="tm">${r.time}</span><div class="grow"><b>${esc(r.label)}</b><span>${daysTxt(r.days)}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!r.en}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלקה כל יום ב-18:00 עד 23:00 על 24°.</p>';
   };
-  sheet(`<h3>תזמונים</h3><div class="list" id="sl"><p>טוען...</p></div>
+  sheet(`<h3>תזמונים</h3><div class="list" id="sl">${SCHED_OK?'':'<p>טוען...</p>'}</div>
     <p>לחיצה על תזמון פותחת אותו לעריכה. התזמונים רצים בשרת, גם כשהטלפון כבוי.</p>
     <div class="row"><button class="btn" id="sx">סגור</button><button class="btn pri" id="sa">+ תזמון חדש</button></div>`,(el,close)=>{
     el.querySelector('#sx').onclick=close;el.querySelector('#sa').onclick=()=>openSchedEdit();
@@ -1046,7 +1048,8 @@ async function openSchedules(){
         try{for(const x of r.items)await api('/schedules/delete',{id:x.id});toast('נמחק')}catch(err){toast(netMsg(err))}}
       loadExtrasLight();
     };
-    loadExtras().then(()=>render2(el));
+    if(SCHED_OK)render2(el);
+    loadSched().then(()=>{if(el.isConnected)render2(el);loadExtrasLight()},()=>{if(!SCHED_OK)el.querySelector('#sl').innerHTML='<p>לא הצלחתי לטעון. נסה שוב.</p>'});
   });
 }
 function loadExtrasLight(){const n=SCHED.filter(x=>x.enabled).length;EXTRA.sched=n?n+' פעילים':'אין'}
