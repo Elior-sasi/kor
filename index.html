@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="5.4">
+<meta name="app-version" content="6.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -433,6 +433,29 @@ html,body{height:100%;overflow:hidden}
 /* 5.2 */
 .app.is-off .bb-t b{color:var(--muted)}
 .app.is-off .bb-dots i.on{background:var(--muted)}
+/* 6.0 calm: solid fills, glass only on floating layers */
+:root{--fill:#1c1c1e;--fill-2:#2c2c2e}
+@media (prefers-color-scheme:light){:root{--fill:#fff;--fill-2:#e9e9ee}}
+.glassy,.pick button,.menu-btn,.step,.seg,.tog,.prof,.more,.turbo,.chip,.item,.btn,.timer-line,.choice,.field input,.field select,.stat-big>div,.hint,.icon-btn{
+  background:var(--fill)!important;border:0!important;box-shadow:none!important}
+#toggles{background:var(--fill-2)!important;border:0!important;box-shadow:none!important}
+.app.is-off .power{background:var(--fill)!important;border:0!important;box-shadow:none!important}
+.power{box-shadow:none!important}
+.turbo[aria-pressed="true"],.chip[aria-pressed="true"],.prof[aria-pressed="true"],.pick button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 22%,var(--fill))!important;border:0!important}
+.air svg{background:transparent!important;border:0!important;box-shadow:none!important;padding:4px!important;width:26px!important;height:26px!important}
+.air[aria-pressed="true"] svg{background:transparent!important;color:var(--accent)}
+.pill.only-dot{background:transparent!important;border:0!important;box-shadow:none!important;width:20px!important;height:20px!important}
+.pill{background:var(--fill)!important;border:0!important;box-shadow:none!important}
+.top-r{gap:4px}
+.more .chip,.sheet .item,.sheet .pick button,.sheet .btn:not(.pri),.sheet .chip{background:var(--fill-2)!important}
+/* air buttons centered between -/+ */
+.air{top:auto!important;bottom:calc(4% + min(25px,8cqw))!important;transform:translateY(50%);flex-direction:row!important;gap:6px!important;
+  padding:8px 12px 8px 10px!important;border-radius:999px!important;background:var(--fill)!important;font-size:13px!important;min-width:0!important}
+.air svg{width:18px!important;height:18px!important;padding:0!important}
+.air-r{right:auto!important;left:calc(50% + 5px)!important}
+.air-l{left:auto!important;right:calc(50% + 5px)!important}
+.air[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 22%,var(--fill))!important}
+.hero{margin-top:-26px!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -699,7 +722,7 @@ function saveDemo(){try{localStorage.setItem('kor_state',JSON.stringify(S))}catc
 try{if(!linked)Object.assign(S,JSON.parse(localStorage.getItem('kor_state')||'{}'))}catch(e){}
 
 /* ---------- dial ---------- */
-const C=150,R=118,A0=135,SPAN=270;
+const C=150,R=133,A0=135,SPAN=270;
 const tmin=()=>CAP&&CAP.temp?CAP.temp.min:16, tmax=()=>CAP&&CAP.temp?CAP.temp.max:30, tstep=()=>CAP&&CAP.temp?CAP.temp.step:1;
 const pt=(deg,r=R)=>{const a=deg*Math.PI/180;return[C+r*Math.cos(a),C+r*Math.sin(a)]};
 const arc=(a1,a2)=>{const[x1,y1]=pt(a1),[x2,y2]=pt(a2);return`M${x1} ${y1}A${R} ${R} 0 ${a2-a1>180?1:0} 1 ${x2} ${y2}`};
