@@ -556,6 +556,22 @@ def _route(req, path: str, body: dict):
 
     if path == "/state":
         return _state(req)
+    if path == "/recover":
+        code = re.sub(r"[^A-Z0-9]", "", str(body.get("code", "")).upper())
+        if len(code) != 10:
+            raise ApiError("הקוד צריך להיות 10 תווים")
+        snap = _db().collection("kor_recover").document(_h(code)).get()
+        if not snap.exists:
+            raise ApiError("קוד לא נכון")
+        d = snap.to_dict()
+        try:
+            raw = _unb64u(d["enc"])
+            key = AESGCM(hashlib.sha256(("rk:" + code).encode()).digest()).decrypt(raw[:12], raw[12:], None).decode()
+        except Exception:  # noqa: BLE001
+            raise ApiError("קוד לא נכון")
+        if not _sess_ref(key).get().exists:
+            raise ApiError("החיבור הזה כבר לא קיים - התחבר מחדש עם QR")
+        return {"key": key}
     sess, ref = _load(req)
     if path.startswith("/push/"):
         res = _push_route(path, body, ref)
@@ -626,6 +642,21 @@ def _route(req, path: str, body: dict):
         return {"saved": True}
     if path == "/notify/test":
         return {"sent": _notify(ref.id, {"title": "Breeze", "body": "ככה ייראו ההתראות מהמזגן"})}
+    if path == "/recover/create":
+        old = sess.get("recover")
+        if old and not body.get("renew"):
+            return {"code": old}
+        abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        code = "".join(secrets.choice(abc) for _ in range(10))
+        if old:
+            _db().collection("kor_recover").document(_h(re.sub(r"[^A-Z0-9]", "", old))).delete()
+        key = req.headers.get("X-Kor-Key", "")
+        nonce = secrets.token_bytes(12)
+        enc = nonce + AESGCM(hashlib.sha256(("rk:" + code).encode()).digest()).encrypt(nonce, key.encode(), None)
+        _db().collection("kor_recover").document(_h(code)).set({"enc": _b64u(enc), "sess": ref.id, "at": time.time()})
+        pretty = code[:5] + "-" + code[5:]
+        ref.update({"recover": pretty})
+        return {"code": pretty}
     if path == "/push/off":
         for s2 in _db().collection("toaster_push").where("sess", "==", ref.id).stream():
             s2.reference.delete()
@@ -688,6 +719,8 @@ def _route(req, path: str, body: dict):
         _send(sess, ref, did, cmds)
         return {"sent": True}
     if path == "/logout":
+        if sess.get("recover"):
+            _db().collection("kor_recover").document(_h(re.sub(r"[^A-Z0-9]", "", sess["recover"]))).delete()
         ref.delete()
         return {"loggedOut": True}
     raise ApiError("נתיב לא מוכר", 404)

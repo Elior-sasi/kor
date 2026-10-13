@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="8.3">
+<meta name="app-version" content="8.4">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -740,6 +740,7 @@ function setDevice(d){
   DEV=d;CFG.dev=d.id;LSset('kor_dev',d.id);CAP=buildCaps(d);readStatus(d.status||{});cacheDev();
   connState=d.online?'on':'offline';buildControls();render();
   api('/prefs',{device:d.id}).catch(()=>{});loadExtras();setTimeout(maybeHint,1500);
+  if(!LS('kor_rec_seen')){LSset('kor_rec_seen','1');setTimeout(()=>{if(!document.querySelector('.scrim'))showRecover(true)},2500)}
 }
 let SCHED=[],SCHED_OK=false;
 try{const c=JSON.parse(localStorage.getItem('kor_sched')||'null');if(Array.isArray(c)){SCHED=c;SCHED_OK=true}}catch(e){}
@@ -905,13 +906,36 @@ function sheet(html,init){
   try{new MutationObserver(()=>requestAnimationFrame(fit)).observe(sh,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']})}catch(e){}
   addEventListener('resize',fit);return close;
 }
+async function showRecover(first){
+  let code;try{code=(await api('/recover/create')).code}catch(e){if(!first)toast(netMsg(e));return}
+  sheet(`<h3>קוד שחזור</h3>
+    <p>אם האייפון ימחק את החיבור, אפשר להתחבר שוב עם הקוד הזה בלי לסרוק QR. שמור אותו, למשל בפתקים.</p>
+    <div style="font-family:var(--f-num);font-size:30px;letter-spacing:.08em;text-align:center;direction:ltr;padding:14px;border-radius:16px;background:var(--fill-2);user-select:text;-webkit-user-select:text">${esc(code)}</div>
+    <p style="font-size:12.5px">מי שיש לו את הקוד שולט במזגן. אל תשתף אותו.</p>
+    <div class="row"><button class="btn" id="rx">${first?'אחר כך':'סגור'}</button><button class="btn pri" id="rc">העתק</button></div>`,(el,close)=>{
+    el.querySelector('#rx').onclick=close;
+    el.querySelector('#rc').onclick=()=>{buzz();const done=()=>toast('הקוד הועתק');
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(code).then(done,()=>toast('סמן את הקוד והעתק'));else toast('סמן את הקוד והעתק')}});
+}
+function openRecover(){
+  sheet(`<h3>קוד שחזור</h3>
+    <div class="field"><label for="rcode">הקוד שקיבלת כשהתחברת</label><input id="rcode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXXX-XXXXX" style="direction:ltr;text-align:center;font-family:var(--f-num);font-size:22px;letter-spacing:.06em"></div>
+    <div class="err-msg" id="rerr"></div>
+    <div class="row"><button class="btn" id="rb">חזרה</button><button class="btn pri" id="rg">התחבר</button></div>`,(el)=>{
+    el.querySelector('#rb').onclick=openConnect;
+    el.querySelector('#rg').onclick=async()=>{const b=el.querySelector('#rg');b.disabled=true;b.textContent='בודק...';el.querySelector('#rerr').textContent='';
+      try{const j=await api('/recover',{code:el.querySelector('#rcode').value});LSset('kor_rec_seen','1');linkOk(j.key,true);document.querySelector('.scrim')?.remove();toast('החיבור שוחזר')}
+      catch(e){el.querySelector('#rerr').textContent=netMsg(e);b.disabled=false;b.textContent='התחבר'}};
+  });
+}
 function openConnect(){
   sheet(`<h3>חיבור למזגן</h3>
     <p>בחר איך להתחבר. מספיק פעם אחת.</p>${(()=>{try{const w=JSON.parse(LS('kor_why')||'null');if(!w)return'';const d=new Date(w.at);return`<p style="font-size:12.5px">ההתנתקות האחרונה: ${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} - ${esc(w.err||'השרת לא זיהה את החיבור')}</p>`}catch(e){return''}})()}
     <button class="choice rec" id="cQR"><b>Smart Life · סריקת QR</b><span>מומלץ. בלי חשבון מפתח, הכול מהטלפון</span></button>
+    <button class="choice" id="cRec"><b>יש לי קוד שחזור</b><span>10 תווים, בלי לסרוק שוב</span></button>
     <button class="choice" id="cDev"><b>חשבון מפתח Tuya</b><span>Access ID + Secret מ-platform.tuya.com</span></button>
     ${linked?'':'<button class="small-link" id="cDemo">להמשיך במצב הדגמה</button>'}`,(el,close)=>{
-    el.querySelector('#cQR').onclick=openQR;el.querySelector('#cDev').onclick=openDev;
+    el.querySelector('#cQR').onclick=openQR;el.querySelector('#cDev').onclick=openDev;el.querySelector('#cRec').onclick=openRecover;
     el.querySelector('#cDemo')&&(el.querySelector('#cDemo').onclick=close);
   });
 }
@@ -967,7 +991,7 @@ function openDev(){
       catch(e){el.querySelector('#derr').textContent=netMsg(e);b.disabled=false;b.textContent='חבר'}};
   });
 }
-function linkOk(key){CFG.key=key;keySave(key);LSset('kor_why',null);linked=true;CFG.dev='';LSset('kor_dev',null);loadDevices();startPoll()}
+function linkOk(key,quiet){CFG.key=key;keySave(key);LSset('kor_why',null);linked=true;CFG.dev='';LSset('kor_dev',null);loadDevices();startPoll()}
 function logout(silent){
   if(!silent&&CFG.key)api('/logout').catch(()=>{});
   CFG.key='';keySave(null);LSset('kor_dev',null);linked=false;DEV=null;CAP=null;connState='off';
@@ -978,11 +1002,12 @@ function openSettings(devs){
   sheet(`<h3>${linked?'החיבור':'מצב הדגמה'}</h3>
     ${linked?`<p>${connState==='on'?'מחובר למזגן ✓':connState==='offline'?'המזגן לא מחובר לרשת כרגע':esc(lastErr||'מתחבר...')}</p>`:'<p>הממשק עובד, אבל לא שולט במזגן אמיתי.</p>'}
     ${list.length>1?`<div class="field"><label for="dv">מכשיר</label><select id="dv">${list.map(d=>`<option value="${esc(d.id)}"${DEV&&d.id===DEV.id?' selected':''}>${esc(d.name||d.id)}</option>`).join('')}</select></div>`:''}
-    ${linked?'<button class="btn" id="sr">רענן</button><button class="btn" id="so">התנתק</button>':'<button class="btn pri" id="sc">התחבר למזגן</button>'}
+    ${linked?'<button class="btn" id="sk">קוד שחזור</button><button class="btn" id="sr">רענן</button><button class="btn" id="so">התנתק</button>':'<button class="btn pri" id="sc">התחבר למזגן</button>'}
     ${DEV?`<details><summary class="small-link">פרטי המזגן</summary><p style="font-size:12px;direction:ltr;text-align:left;user-select:text;-webkit-user-select:text">${esc((DEV.functions||[]).map(f=>f.code).join(', '))}</p></details>`:''}
     <details><summary class="small-link">כתובת שרת</summary><div class="field" style="margin-top:8px"><input id="sa" value="${esc(CFG.api)}"></div><button class="btn" id="ss" style="margin-top:8px">שמור כתובת</button></details>`,(el,close)=>{
     const dv=el.querySelector('#dv');dv&&(dv.onchange=()=>{const d=list.find(x=>x.id===dv.value);if(d){setDevice(d);close()}});
     el.querySelector('#sr')&&(el.querySelector('#sr').onclick=()=>{close();loadDevices()});
+    el.querySelector('#sk')&&(el.querySelector('#sk').onclick=()=>showRecover(false));
     el.querySelector('#so')&&(el.querySelector('#so').onclick=()=>{logout();close();toast('נותק')});
     el.querySelector('#sc')&&(el.querySelector('#sc').onclick=openConnect);
     el.querySelector('#ss').onclick=()=>{CFG.api=el.querySelector('#sa').value.trim()||DEFAULT_API;LSset('kor_api',CFG.api);toast('נשמר');close();if(linked)loadDevices()};
