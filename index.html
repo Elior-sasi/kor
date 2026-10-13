@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="8.1">
+<meta name="app-version" content="8.2">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -575,6 +575,10 @@ html,body{height:100%;overflow:hidden}
 const DEFAULT_API='https://europe-west1-tab-fd9b6.cloudfunctions.net/kor';
 const LS=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const LSset=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const IDB=(mode,fn)=>new Promise(res=>{try{const o=indexedDB.open('breeze',1);o.onupgradeneeded=()=>o.result.createObjectStore('kv');o.onsuccess=()=>{try{const tx=o.result.transaction('kv',mode);const r=fn(tx.objectStore('kv'));tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>res(null)}catch(e){res(null)}};o.onerror=()=>res(null)}catch(e){res(null)}});
+const idbSet=(k,v)=>IDB('readwrite',st=>v==null?st.delete(k):st.put(v,k));
+const idbGet=k=>IDB('readonly',st=>st.get(k));
+const keySave=v=>{LSset('kor_key',v);idbSet('kor_key',v)};
 const CFG={api:LS('kor_api')||DEFAULT_API,key:LS('kor_key')||'',dev:LS('kor_dev')||''};
 const $=id=>document.getElementById(id);
 const buzz=()=>{try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}};
@@ -716,7 +720,7 @@ function timerCommand(hours){ // hours=0 cancels
 async function api(path,body){
   const r=await fetch(CFG.api.replace(/\/$/,'')+path,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},CFG.key?{'X-Kor-Key':CFG.key}:{}),body:JSON.stringify(body||{})});
   let j;try{j=await r.json()}catch(e){throw new Error('השרת לא ענה ('+r.status+')')}
-  if(r.status===401){logout(true);throw new Error(j.error||'החיבור פג')}
+  if(r.status===401){LSset('kor_why',JSON.stringify({at:Date.now(),path,err:j.error||''}));logout(true);setTimeout(()=>{if(!linked)openConnect()},300);throw new Error(j.error||'החיבור פג')}
   if(!j.ok)throw new Error(j.error||'שגיאה');
   return j;
 }
@@ -903,7 +907,7 @@ function sheet(html,init){
 }
 function openConnect(){
   sheet(`<h3>חיבור למזגן</h3>
-    <p>בחר איך להתחבר. מספיק פעם אחת.</p>
+    <p>בחר איך להתחבר. מספיק פעם אחת.</p>${(()=>{try{const w=JSON.parse(LS('kor_why')||'null');if(!w)return'';const d=new Date(w.at);return`<p style="font-size:12.5px">ההתנתקות האחרונה: ${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})} - ${esc(w.err||'השרת לא זיהה את החיבור')}</p>`}catch(e){return''}})()}
     <button class="choice rec" id="cQR"><b>Smart Life · סריקת QR</b><span>מומלץ. בלי חשבון מפתח, הכול מהטלפון</span></button>
     <button class="choice" id="cDev"><b>חשבון מפתח Tuya</b><span>Access ID + Secret מ-platform.tuya.com</span></button>
     ${linked?'':'<button class="small-link" id="cDemo">להמשיך במצב הדגמה</button>'}`,(el,close)=>{
@@ -963,10 +967,10 @@ function openDev(){
       catch(e){el.querySelector('#derr').textContent=netMsg(e);b.disabled=false;b.textContent='חבר'}};
   });
 }
-function linkOk(key){CFG.key=key;LSset('kor_key',key);linked=true;CFG.dev='';LSset('kor_dev',null);loadDevices();startPoll()}
+function linkOk(key){CFG.key=key;keySave(key);LSset('kor_why',null);linked=true;CFG.dev='';LSset('kor_dev',null);loadDevices();startPoll()}
 function logout(silent){
   if(!silent&&CFG.key)api('/logout').catch(()=>{});
-  CFG.key='';LSset('kor_key',null);LSset('kor_dev',null);linked=false;DEV=null;CAP=null;connState='off';
+  CFG.key='';keySave(null);LSset('kor_dev',null);linked=false;DEV=null;CAP=null;connState='off';
   S=Object.assign({},DEMO);buildControls();render();
 }
 function openSettings(devs){
@@ -1347,7 +1351,8 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
 })();
 if(linked){try{const c=JSON.parse(localStorage.getItem('kor_last')||'null');if(c&&(!CFG.dev||c.id===CFG.dev)){DEV=c;CAP=buildCaps(c);readStatus(c.status||{})}}catch(e){}}
 buildControls();render();
-if(linked){loadDevices();startPoll()}
+if(linked){loadDevices();startPoll();idbGet('kor_key').then(v=>{if(v!==CFG.key)idbSet('kor_key',CFG.key)})}
+else idbGet('kor_key').then(v=>{if(v&&v.length>=20&&!linked){CFG.key=v;LSset('kor_key',v);linked=true;connState='wait';renderConn();loadDevices();startPoll();toast('החיבור שוחזר')}});
 })();
 </script>
 </body></html>
