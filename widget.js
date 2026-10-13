@@ -11,12 +11,14 @@ const g=new LinearGradient();g.colors=[new Color("#16171a"),new Color(on?acc:"#1
 w.setPadding(14,16,14,16);w.refreshAfterDate=new Date(Date.now()+5*60*1000);
 const txt=(stack,t,size,color,weight)=>{const x=stack.addText(t);x.font=weight==="b"?Font.boldSystemFont(size):weight==="l"?Font.lightRoundedSystemFont(size):Font.mediumSystemFont(size);x.textColor=new Color(color||"#ffffff");x.rightAlignText();x.lineLimit=1;x.minimumScaleFactor=0.6;return x};
 const row=w.addStack();row.layoutHorizontally();row.topAlignContent();
-let side=null;
-if(fam!=="small"){side=row.addStack();side.layoutVertically();row.addSpacer()}else{row.addSpacer()}
+// iOS lays horizontal stacks right-to-left in Hebrew, so the first item sits on the right
 const info=row.addStack();info.layoutVertically();
+row.addSpacer();
+let side=null;
+if(fam!=="small"){side=row.addStack();side.layoutVertically()}
 const top=info.addStack();top.layoutHorizontally();top.centerAlignContent();
-txt(top,"Breeze",12,"#ffffffaa","b");top.addSpacer(5);
 const dot=top.addText("●");dot.font=Font.systemFont(9);dot.textColor=new Color(s?(on?"#30d158":"#8e8e93"):"#ff453a");
+top.addSpacer(4);txt(top,"Breeze",12,"#ffffffaa","b");
 info.addSpacer(4);
 const ev=s?(s.timer?((s.timer.power?"הדלקה ":"כיבוי ")+hhmm(s.timer.at)):s.next?((s.next.power?"הדלקה ":"כיבוי ")+hhmm(s.next.at)):""):"";
 if(!s){txt(info,"אין חיבור",18,"#ffffff","b");txt(info,"בדוק אינטרנט",11,"#ffffff99")}
