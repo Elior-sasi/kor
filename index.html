@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="8.2">
+<meta name="app-version" content="8.3">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1207,6 +1207,17 @@ function openSchedEdit(row){
 }
 
 function b64url(o){return btoa(JSON.stringify(o)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+const WIDGET_JS="// Breeze - ווידג׳ט מזגן (Scriptable)\nconst API=\"__API__\", K=\"__K__\", D=\"__D__\";\nconst ACT={on:\"__ON__\",off:\"__OFF__\"};\nconst MODE={cold:[\"קירור\",\"#5ec8ff\"],hot:[\"חימום\",\"#ff9a52\"],wet:[\"ייבוש\",\"#b7a3ff\"],wind:[\"אוורור\",\"#6fe0b2\"],auto:[\"אוטו\",\"#e6cf72\"]};\nconst FAN={strong:\"חזק\",auto:\"אוטו\",low:\"נמוך\",middle:\"בינוני\",high:\"גבוה\",mute:\"שקט\"};\nconst q=(args.queryParameters||{});\nif(q.a&&ACT[q.a]){\n  let ok=true;try{await new Request(ACT[q.a]).loadString()}catch(e){ok=false}\n  const n=new Notification();n.title=\"Breeze\";n.body=ok?(q.a===\"on\"?\"המזגן הודלק\":\"המזגן כובה\"):\"לא הצלחתי לשלוח\";await n.schedule();\n}\nlet s=null;try{const r=new Request(API+\"/state?k=\"+encodeURIComponent(K)+\"&d=\"+encodeURIComponent(D));r.timeoutInterval=20;s=await r.loadJSON();if(!s.ok)s=null}catch(e){s=null}\nconst st=s?s.status:{};\nconst on=!!st.switch, m=MODE[st.mode]||[\"\",'#8e8e93'], acc=on?m[1]:\"#8e8e93\";\nconst hhmm=t=>{const d=new Date(t*1000);return(\"0\"+d.getHours()).slice(-2)+\":\"+(\"0\"+d.getMinutes()).slice(-2)};\nconst fam=config.widgetFamily||\"medium\";\nconst w=new ListWidget();\nconst g=new LinearGradient();g.colors=[new Color(\"#16171a\"),new Color(on?acc:\"#16171a\",on?0.28:1)];g.locations=[0.35,1];g.startPoint=new Point(0,0);g.endPoint=new Point(1,1);w.backgroundGradient=g;\nw.setPadding(14,14,14,14);w.refreshAfterDate=new Date(Date.now()+5*60*1000);\nconst txt=(stack,t,size,color,weight)=>{const x=stack.addText(t);x.font=weight===\"b\"?Font.boldSystemFont(size):weight===\"l\"?Font.lightRoundedSystemFont(size):Font.mediumSystemFont(size);x.textColor=new Color(color||\"#ffffff\");x.rightAlignText();x.lineLimit=1;x.minimumScaleFactor=0.6;return x};\nconst row=w.addStack();row.layoutHorizontally();\nconst info=row.addStack();info.layoutVertically();\nconst top=info.addStack();top.layoutHorizontally();top.centerAlignContent();\nconst dot=top.addText(\"●\");dot.font=Font.systemFont(9);dot.textColor=new Color(s?(on?\"#30d158\":\"#8e8e93\"):\"#ff453a\");\ntop.addSpacer(4);txt(top,\"Breeze\",12,\"#ffffffaa\",\"b\");\ninfo.addSpacer(4);\nif(!s){txt(info,\"אין חיבור\",18,\"#ffffff\",\"b\");txt(info,\"בדוק אינטרנט\",11,\"#ffffff99\")}\nelse{\n  txt(info,on?(st.temp_set+\"°\"):\"כבוי\",on?40:30,\"#ffffff\",\"l\");\n  txt(info,on?(m[0]+(FAN[st.fan_speed_enum]?\" · \"+FAN[st.fan_speed_enum]:\"\")):\"\",13,acc,\"b\");\n  info.addSpacer(2);\n  if(st.temp_current!=null)txt(info,\"בחדר \"+st.temp_current+\"°\",12,\"#ffffffcc\");\n  const ev=s.timer?((s.timer.power?\"הדלקה \":\"כיבוי \")+hhmm(s.timer.at)):s.next?((s.next.power?\"הדלקה \":\"כיבוי \")+hhmm(s.next.at)):\"\";\n  if(ev)txt(info,\"⏱ \"+ev,11,\"#ffffff99\");\n  if(s.fault&&s.fault.length)txt(info,\"⚠ תקלה \"+s.fault.join(\",\"),11,\"#ff6b6b\",\"b\");\n}\nif(fam!==\"small\"){\n  row.addSpacer();\n  const btns=row.addStack();btns.layoutVertically();btns.centerAlignContent();\n  const mk=(label,a,bg,fg)=>{const b=btns.addStack();b.size=new Size(96,44);b.cornerRadius=14;b.backgroundColor=new Color(bg,0.92);b.centerAlignContent();\n    const t=b.addText(label);t.font=Font.boldSystemFont(15);t.textColor=new Color(fg);\n    b.url=\"scriptable:///run/\"+encodeURIComponent(Script.name())+\"?a=\"+a};\n  mk(\"הדלק\",\"on\",on?\"#2c2c2e\":\"#ff9a52\",on?\"#ffffff99\":\"#1c1c1e\");btns.addSpacer(8);mk(\"כבה\",\"off\",on?\"#ffffff\":\"#2c2c2e\",on?\"#1c1c1e\":\"#ffffff99\");\n}else{row.addSpacer()}\nw.addSpacer();\nif(config.runsInWidget)Script.setWidget(w);else if(fam===\"small\")await w.presentSmall();else await w.presentMedium();\nScript.complete();\n";
+function openWidget(base,acts){
+  const src=WIDGET_JS.replace('__API__',CFG.api.replace(/\/$/,'')).replace('__K__',new URL(base).searchParams.get('k')).replace('__D__',DEV.id).replace('__ON__',acts[0].u).replace('__OFF__',acts[1].u);
+  sheet(`<h3>ווידג׳ט למסך הבית</h3>
+    <div class="hint">1. התקן את <b>Scriptable</b> מה-App Store (חינם).<br>2. לחץ כאן <b>העתק סקריפט</b>.<br>3. ב-Scriptable: <b>+</b> ← הדבק ← קרא לו <b>Breeze</b> ← סיום.<br>4. במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← בינוני ← הוסף.<br>5. לחיצה ארוכה על הווידג׳ט ← ערוך ← Script: <b>Breeze</b>.</div>
+    <p style="font-size:12.5px">הסקריפט כולל את קישור השליטה. אל תשתף אותו.</p>
+    <div class="row"><button class="btn" id="wx">סגור</button><button class="btn pri" id="wc">העתק סקריפט</button></div>`,(el,close)=>{
+    el.querySelector('#wx').onclick=close;
+    el.querySelector('#wc').onclick=()=>{buzz();const fb=()=>{const t=document.createElement('textarea');t.value=src;t.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(t);t.select();try{document.execCommand('copy');toast('הסקריפט הועתק')}catch(e){toast('לא הצלחתי להעתיק')}t.remove()};
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(src).then(()=>toast('הסקריפט הועתק'),fb);else fb()}});
+}
 async function openSiri(renew){
   const close0=sheet('<h3>Siri ומיקום</h3><p>מכין קישורים...</p>');
   let tok;try{tok=(await api('/token',{renew:!!renew})).token}catch(e){close0();return toast(netMsg(e))}
@@ -1222,10 +1233,12 @@ async function openSiri(renew){
     <div class="hint"><b>Siri:</b> אפליקציית קיצורים ← <b>+</b> ← <b>"קבל תוכן של URL"</b> ← הדבק קישור ← תן שם, למשל "הדלק מזגן".<br><b>לפי מיקום:</b> קיצורים ← אוטומציה ← <b>הגעה</b>/<b>יציאה</b> ← בית ← הפעל מיד ← אותה פעולה.</div>
     <div class="alist" id="al">${acts.map((a,i)=>`<div class="item"><div class="grow"><b>${esc(a.n)}</b></div><button class="icon-btn" data-cp="${i}" aria-label="העתק">${ICON_COPY}</button></div>`).join('')}</div>
     <input id="cpbox" readonly tabindex="-1" aria-hidden="true" style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;font-size:16px">
+    <button class="choice" id="aw" style="padding-block:9px"><b>ווידג׳ט למסך הבית</b><span>מצב המזגן וכפתורי הדלקה וכיבוי, דרך Scriptable</span></button>
     <p style="font-size:12.5px">הקישורים פותחים את המזגן בלי סיסמה. אל תשתף אותם.</p>
     <div class="row"><button class="btn" id="ar">קישורים חדשים</button><button class="btn pri" id="ax">סגור</button></div>`,(el,close)=>{
     el.querySelector('#ax').onclick=close;
     el.querySelector('#ar').onclick=()=>openSiri(true);
+    el.querySelector('#aw').onclick=()=>openWidget(base,acts);
     el.querySelector('#al').onclick=e=>{const b=e.target.closest('[data-cp]');if(!b)return;const u=acts[b.dataset.cp].u;buzz();
       const fb=()=>{const i=el.querySelector('#cpbox');i.value=u;i.select();try{document.execCommand('copy');toast('הקישור הועתק')}catch(e){toast('לא הצלחתי להעתיק')}};
       if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>toast('הקישור הועתק'),fb);else fb()};

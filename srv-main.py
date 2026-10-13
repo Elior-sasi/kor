@@ -325,6 +325,46 @@ def _watch(snap, sess, did, st, on, mode, now, today):
             _notify(snap.id, {"title": "תרמוסטט", "body": msg})
 
 
+def _state(req):
+    """Read-only status for home-screen widgets, authorized by the Siri link token."""
+    k = req.args.get("k", "")
+    tok = _db().collection("kor_actions").document(_h(k)).get() if len(k) > 10 else None
+    if not tok or not tok.exists:
+        raise ApiError("קישור לא תקף", 401)
+    sid = tok.to_dict()["sess"]
+    sess, ref = _sess_by_hash(sid)
+    if not sess:
+        raise ApiError("החיבור פג", 401)
+    did = req.args.get("d") or sess.get("device")
+    st = _status(sess, ref, did)
+    timer, nxt = None, None
+    now = dt.datetime.now(TZ)
+    best = None
+    for snap in _db().collection("kor_schedules").where("sess", "==", sid).stream():
+        d = snap.to_dict()
+        if d.get("once_at"):
+            on = bool(d["cmds"][0].get("value")) if d.get("cmds") else False
+            timer = {"at": d["once_at"], "power": on}
+            continue
+        if not d.get("enabled") or not d.get("time"):
+            continue
+        hh, mm = map(int, d["time"].split(":"))
+        for add in range(8):
+            day = now + dt.timedelta(days=add)
+            if (day.weekday() + 1) % 7 not in (d.get("days") or []):
+                continue
+            at = day.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            if at <= now:
+                continue
+            on = any(c.get("value") is True for c in d.get("cmds") or [] if c.get("code") == "switch")
+            if best is None or at < best[0]:
+                best = (at, on)
+            break
+    if best:
+        nxt = {"at": best[0].timestamp(), "power": best[1]}
+    return {"status": st, "timer": timer, "next": nxt, "fault": _fault_codes(st.get("fault")), "t": time.time()}
+
+
 def _act(req):
     k = req.args.get("k", "")
     tok = _db().collection("kor_actions").document(_h(k)).get() if len(k) > 10 else None
@@ -514,6 +554,8 @@ def _route(req, path: str, body: dict):
             out["push_error"] = str(e)
         return out
 
+    if path == "/state":
+        return _state(req)
     sess, ref = _load(req)
     if path.startswith("/push/"):
         res = _push_route(path, body, ref)
