@@ -8,7 +8,7 @@ const hhmm=t=>{const d=new Date(t*1000);return("0"+d.getHours()).slice(-2)+":"+(
 const fam=config.widgetFamily||"medium";
 const w=new ListWidget();
 const g=new LinearGradient();g.colors=[new Color("#16171a"),new Color(on?acc:"#16171a",on?0.28:1)];g.locations=[0.35,1];g.startPoint=new Point(0,0);g.endPoint=new Point(1,1);w.backgroundGradient=g;
-w.setPadding(14,16,14,16);w.refreshAfterDate=new Date(Date.now()+5*60*1000);
+w.setPadding(14,16,14,16);w.refreshAfterDate=new Date(Date.now()+60*1000);
 const txt=(stack,t,size,color,weight)=>{const x=stack.addText(t);x.font=weight==="b"?Font.boldSystemFont(size):weight==="l"?Font.lightRoundedSystemFont(size):Font.mediumSystemFont(size);x.textColor=new Color(color||"#ffffff");x.rightAlignText();x.lineLimit=1;x.minimumScaleFactor=0.6;return x};
 const row=w.addStack();row.layoutHorizontally();row.topAlignContent();
 // iOS lays horizontal stacks right-to-left in Hebrew, so the first item sits on the right
@@ -28,6 +28,7 @@ else{
   info.addSpacer(2);
   if(st.temp_current!=null)txt(info,"בחדר "+st.temp_current+"°",12,"#ffffffcc");
   if(fam==="small"&&ev)txt(info,"⏱ "+ev,11,"#ffffff99");
+  if(fam==="small")txt(info,"עודכן "+hhmm(s.t||Date.now()/1000),10,"#ffffff66");
   if(s.fault&&s.fault.length)txt(info,"⚠ תקלה "+s.fault.join(","),11,"#ff6b6b","b");
 }
 if(side&&s){
