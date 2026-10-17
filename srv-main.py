@@ -242,7 +242,7 @@ def _tick():
                 ran += 1
         except Exception:  # noqa: BLE001
             errs += 1
-        if sc.get("once_at"):
+        if sc.get("once_at") or sc.get("once"):
             snap.reference.delete()
         else:
             snap.reference.update({"last": today + " " + hm})
@@ -597,16 +597,17 @@ def _route(req, path: str, body: dict):
             if d.get("once_at"):
                 timer = {"at": d["once_at"], "power": bool(d["cmds"][0].get("value")) if d.get("cmds") else False}
             else:
-                out.append({"id": snap.id, **{k: d.get(k) for k in ("time", "days", "label", "enabled", "cmds")}})
+                out.append({"id": snap.id, **{k: d.get(k) for k in ("time", "days", "label", "enabled", "cmds", "once")}})
         out.sort(key=lambda x: x["time"] or "")
-        return {"schedules": out, "timer": timer}
+        return {"schedules": out, "timer": timer, "once": True}
     if path == "/schedules/save":
         sid = body.get("id") or (ref.id + "_" + secrets.token_hex(4))
         if not sid.startswith(ref.id):
             raise ApiError("לא מורשה", 403)
         _db().collection("kor_schedules").document(sid).set({
             "sess": ref.id, "device": body.get("device"), "time": body.get("time"), "days": body.get("days") or [],
-            "cmds": body.get("cmds") or [], "label": body.get("label", ""), "enabled": bool(body.get("enabled", True))})
+            "cmds": body.get("cmds") or [], "label": body.get("label", ""), "enabled": bool(body.get("enabled", True)),
+            "once": bool(body.get("once"))})
         return {"id": sid}
     if path == "/schedules/delete":
         sid = body.get("id", "")

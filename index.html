@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="8.5">
+<meta name="app-version" content="8.6">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -118,6 +118,7 @@ body{position:fixed;inset:0;width:100%}
 .sheet .trow2 input[type=time]{width:140px!important;min-width:0;max-width:140px;justify-self:end;border-radius:14px!important;color:var(--fg)!important;-webkit-text-fill-color:var(--fg);font-family:var(--f-num);font-weight:400;height:auto!important;font-size:24px!important;padding:8px 6px!important;text-align:center;-webkit-appearance:none;appearance:none;display:flex;align-items:center;justify-content:center;background:var(--fill)!important;border:0}
 .sheet .trow2 input[type=time]::-webkit-date-and-time-value{text-align:center;margin:0;color:var(--fg)}
 .trow2.dis input,.trow2.dis label{opacity:.35}
+.tpane{height:262px;display:flex;flex-direction:column;gap:10px;justify-content:center}.tpane[hidden]{display:none!important}
 .srow .grow{min-width:0}.srow .st{display:block;font-family:var(--f-num);font-size:21px;font-weight:400}
 .srow .grow span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tstep{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -744,7 +745,8 @@ function setDevice(d){
 }
 let SCHED=[],SCHED_OK=false;
 try{const c=JSON.parse(localStorage.getItem('kor_sched')||'null');if(Array.isArray(c)){SCHED=c;SCHED_OK=true}}catch(e){}
-async function loadSched(){const j=await api('/schedules');SCHED=j.schedules||[];SCHED_OK=true;try{localStorage.setItem('kor_sched',JSON.stringify(SCHED))}catch(e){}return j}
+let ONCE_OK=false;try{ONCE_OK=localStorage.getItem('kor_once')==='1'}catch(e){}
+async function loadSched(){const j=await api('/schedules');SCHED=j.schedules||[];SCHED_OK=true;if(j.once){ONCE_OK=true;LSset('kor_once','1')}try{localStorage.setItem('kor_sched',JSON.stringify(SCHED))}catch(e){}return j}
 async function loadExtras(){
   try{const j=await loadSched();
     if(j.timer){S.timerAt=j.timer.at*1000;S.timerPower=j.timer.power}else{S.timerAt=0}
@@ -859,20 +861,55 @@ function openTimer(){
   const left=timerLeftMin();let tot=left?Math.max(1,left):120;
   const H=Array.from({length:13},(_,i)=>i),M=Array.from({length:60},(_,i)=>i);
   const col=(id,arr,sfx)=>`<div class="wheel" id="${id}"><div class="wpad"></div>${arr.map(v=>`<div class="wi" data-v="${v}">${v}</div>`).join('')}<div class="wpad"></div></div><span class="wsfx">${sfx}</span>`;
-  sheet(`<h3>${S.power?'כיבוי אוטומטי':'הדלקה אוטומטית'}</h3>
-    <div class="wheels"><div class="wsel"></div>${col('wh',H,'ש׳')}${col('wm',M,'דק׳')}</div>
-    ${left?`<p style="text-align:center">${S.timerPower?'יידלק':'ייכבה'} בעוד ${timerLbl()}</p>`:''}
+  const pad=n=>String(n).padStart(2,'0'),now=new Date(),later=new Date(Date.now()+2*3600e3);
+  const tOn=pad(later.getHours())+':00',tOff=pad((later.getHours()+2)%24)+':00';
+  const swRow=(id,tid,on,lbl,val)=>`<div class="trow2${on?'':' dis'}" id="r${id}"><button class="sw" id="sw${id}" aria-pressed="${on}" aria-label="${lbl}"></button><label for="${tid}">${lbl}</label><input type="time" id="${tid}" value="${val}"></div>`;
+  sheet(`<h3>טיימר</h3>
+    <div class="seg3" id="tmode"${ONCE_OK?'':' hidden'}><button class="chip" data-t="in" aria-pressed="true">בעוד</button><button class="chip" data-t="at" aria-pressed="false">בשעה</button></div>
+    <div id="pIn" class="tpane">
+      <p style="text-align:center;margin:0">${S.power?'כיבוי אוטומטי בעוד':'הדלקה אוטומטית בעוד'}</p>
+      <div class="wheels"><div class="wsel"></div>${col('wh',H,'ש׳')}${col('wm',M,'דק׳')}</div>
+      ${left?`<p style="text-align:center;margin:0">${S.timerPower?'יידלק':'ייכבה'} בעוד ${timerLbl()}</p>`:''}
+    </div>
+    <div id="pAt" class="tpane" hidden>
+      <div class="tpair">${swRow('On','atOn',!S.power,'הדלקה',tOn)}${swRow('Off','atOff',true,'כיבוי',tOff)}</div>
+      <p style="font-size:12.5px;margin:0">פעם אחת, בשעות הקרובות. לקביעה קבועה לפי ימים - תזמונים.</p>
+    </div>
+    <div class="err-msg" id="terr"></div>
     <div class="row"><button class="btn" id="tc">${left?'בטל טיימר':'סגור'}</button><button class="btn pri" id="ts">הפעל</button></div>`,(el,close)=>{
-    const IH=44,wh=el.querySelector('#wh'),wm=el.querySelector('#wm');
+    const q=x=>el.querySelector(x);
+    const IH=44,wh=q('#wh'),wm=q('#wm');
     const val=w=>{const i=Math.round(w.scrollTop/IH);const it=w.querySelectorAll('.wi')[i];return it?+it.dataset.v:0};
     const mark=w=>{const i=Math.round(w.scrollTop/IH);w.querySelectorAll('.wi').forEach((x,k)=>x.classList.toggle('on',k===i))};
     const set=(w,v,arr)=>{w.scrollTop=Math.max(0,arr.indexOf(v))*IH;mark(w)};
     set(wh,Math.min(12,Math.floor(tot/60)),H);set(wm,tot%60,M);
-    [wh,wm].forEach(w=>{let last=-1,t;w.addEventListener('scroll',()=>{const i=Math.round(w.scrollTop/IH);if(i!==last){last=i;mark(w);buzz()}
-})});
+    [wh,wm].forEach(w=>{let last=-1;w.addEventListener('scroll',()=>{const i=Math.round(w.scrollTop/IH);if(i!==last){last=i;mark(w);buzz()}})});
     el.querySelectorAll('.wi').forEach(x=>x.onclick=()=>{const w=x.parentElement;const k=[...w.querySelectorAll('.wi')].indexOf(x);w.scrollTo({top:k*IH,behavior:'smooth'})});
-    el.querySelector('#tc').onclick=()=>{if(left){setTimer(0);toast('הטיימר בוטל')}close()};
-    el.querySelector('#ts').onclick=()=>{const m=val(wh)*60+val(wm);if(!m)return toast('בחר זמן');setTimer(m/60);toast('הטיימר הופעל');close()};
+    let mode='in';
+    q('#tmode').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;buzz();mode=b.dataset.t;el.querySelectorAll('#tmode .chip').forEach(c=>c.setAttribute('aria-pressed',c===b));
+      q('#pIn').hidden=mode!=='in';q('#pAt').hidden=mode!=='at';if(mode==='in')set(wh,val(wh),H)};
+    const swT=(id,other)=>{q('#sw'+id).onclick=()=>{buzz();const b=q('#sw'+id),v=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',v);
+      if(!v&&q('#sw'+other).getAttribute('aria-pressed')!=='true')q('#sw'+other).setAttribute('aria-pressed','true');
+      ['On','Off'].forEach(k=>q('#r'+k).classList.toggle('dis',q('#sw'+k).getAttribute('aria-pressed')!=='true'))}};
+    swT('On','Off');swT('Off','On');
+    ['On','Off'].forEach(k=>q('#r'+k).addEventListener('click',e=>{if(e.target.tagName!=='BUTTON'&&q('#r'+k).classList.contains('dis'))q('#sw'+k).click()}));
+    q('#tc').onclick=()=>{if(left){setTimer(0);toast('הטיימר בוטל')}close()};
+    q('#ts').onclick=async()=>{
+      if(mode==='in'){const m=val(wh)*60+val(wm);if(!m)return toast('בחר זמן');setTimer(m/60);toast('הטיימר הופעל');return close()}
+      const useOn=q('#swOn').getAttribute('aria-pressed')==='true',useOff=q('#swOff').getAttribute('aria-pressed')==='true';
+      const on=q('#atOn').value,off=q('#atOff').value;
+      if((useOn&&!on)||(useOff&&!off))return q('#terr').textContent='בחר שעה';
+      if(useOn&&useOff&&on===off)return q('#terr').textContent='שעת הכיבוי צריכה להיות שונה משעת ההדלקה';
+      const nowHM=pad(new Date().getHours())+':'+pad(new Date().getMinutes()),wd=new Date().getDay();
+      const dayOf=(t,after)=>((after!=null?(t<=after.t?after.d+1:after.d):(t<=nowHM?wd+1:wd))%7);
+      const g=Math.random().toString(36).slice(2,8),tag=useOn&&useOff?' #r:'+g:'';
+      const items=[];let first=null;
+      if(useOn){first={t:on,d:dayOf(on)};items.push({time:on,days:[first.d],cmds:toCommands({power:true}),label:'הדלקה'+tag})}
+      if(useOff){const d=first?dayOf(off,first):dayOf(off);items.push({time:off,days:[d],cmds:toCommands({power:false}),label:'כבה'+tag})}
+      const b=q('#ts');b.disabled=true;b.textContent='שומר...';
+      try{for(const it of items)await api('/schedules/save',{device:DEV.id,enabled:true,once:true,...it});loadSched().then(loadExtrasLight).catch(()=>{});
+        toast(useOn&&useOff?`יידלק ב-${on} וייכבה ב-${off}`:useOn?`יידלק ב-${on}`:`ייכבה ב-${off}`);close()}
+      catch(err){q('#terr').textContent=netMsg(err);b.disabled=false;b.textContent='הפעל'}};
   });
 }
 const timerLeftMin=()=>S.timerAt&&S.timerAt>Date.now()?Math.ceil((S.timerAt-Date.now())/60000):0;
@@ -1145,14 +1182,14 @@ async function openSchedules(){
   const RX=/\s#r:(\w+)$/;
   const rows=()=>{const out=[],seen={};
     SCHED.forEach(x=>{const m=(x.label||'').match(RX);
-      if(!m){const off=/^כבה/.test(x.label||'');out.push({items:[x],time:(off?'כיבוי ':'הדלקה ')+'<bdi dir="ltr">'+esc(x.time)+'</bdi>',label:off?'':(x.label||'').replace(/^הדלק · /,''),days:x.days,en:x.enabled});return}
+      if(!m){const off=/^כבה/.test(x.label||'');out.push({items:[x],time:(off?'כיבוי ':'הדלקה ')+'<bdi dir="ltr">'+esc(x.time)+'</bdi>',label:off||x.label==='הדלקה'?'':(x.label||'').replace(/^הדלק · /,''),days:x.days,once:x.once,en:x.enabled});return}
       if(seen[m[1]])return;seen[m[1]]=1;
       const grp=SCHED.filter(y=>(y.label||'').match(RX)?.[1]===m[1]);
       const on=grp.find(y=>!/^כבה/.test(y.label))||grp[0],off=grp.find(y=>y!==on);
-      out.push({items:grp,time:'<bdi dir="ltr">'+esc(on.time)+(off?' – '+esc(off.time):'')+'</bdi>',label:on.label.replace(RX,'').replace(/^הדלק · /,''),days:on.days,en:on.enabled})});
+      out.push({items:grp,time:'<bdi dir="ltr">'+esc(on.time)+(off?' – '+esc(off.time):'')+'</bdi>',label:on.label.replace(RX,'').replace(/^הדלק · /,'').replace(/^הדלקה$/,''),days:on.days,once:on.once,en:on.enabled})});
     return out};
   const render2=(el)=>{const R=rows();el._rows=R;
-    el.querySelector('#sl').innerHTML=R.length?R.map((r,i)=>`<div class="item srow${r.en?'':' off'}" data-row="${i}" style="cursor:pointer"><div class="grow"><b class="st">${r.time}</b><span>${[r.label,daysTxt(r.days)].filter(Boolean).map(esc).join(' · ')}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!r.en}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלקה כל יום ב-18:00 עד 23:00 על 24°.</p>';
+    el.querySelector('#sl').innerHTML=R.length?R.map((r,i)=>`<div class="item srow${r.en?'':' off'}" data-row="${i}" style="cursor:pointer"><div class="grow"><b class="st">${r.time}</b><span>${[r.label,r.once?'פעם אחת':daysTxt(r.days)].filter(Boolean).map(esc).join(' · ')}</span></div><button class="sw" data-sw="${i}" aria-pressed="${!!r.en}" aria-label="פעיל"></button><button class="icon-btn" data-del="${i}" aria-label="מחק">${ICON_DEL}</button></div>`).join(''):'<p>אין תזמונים עדיין. למשל: הדלקה כל יום ב-18:00 עד 23:00 על 24°.</p>';
   };
   sheet(`<h3>תזמונים</h3><div class="list" id="sl">${SCHED_OK?'':'<p>טוען...</p>'}</div>
     <p>לחיצה על תזמון פותחת אותו לעריכה. התזמונים רצים בשרת, גם כשהטלפון כבוי.</p>
