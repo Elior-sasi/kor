@@ -123,13 +123,28 @@ ol{margin:0;padding-inline-start:22px;display:flex;flex-direction:column;gap:8px
 .splash svg{width:132px;height:auto;overflow:visible;animation:sin .5s ease-out both}
 .splash b{font-size:34px;font-weight:700;letter-spacing:-.3px;color:#fff3e0;animation:sin .6s .35s ease-out both}
 @keyframes sin{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+
+.lid{transform-box:view-box;transform-origin:256px 140px}
+.splash .lid{animation:plugIn 1s .15s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes plugIn{0%{transform:translateY(-90px) rotate(-14deg)}60%{transform:translateY(8px) rotate(1deg)}100%{transform:none}}
+.splash .spk{opacity:0;animation:spark .5s .85s ease-out both}
+@keyframes spark{0%{opacity:0;transform:scale(.6)}50%{opacity:1}100%{opacity:0;transform:scale(1.15)}}
+.splash .spk{transform-box:view-box;transform-origin:256px 200px}
+.brand.busy .lid{animation:unplugBob 1.1s ease-in-out infinite}
+@keyframes unplugBob{0%,100%{transform:none}50%{transform:translateY(-26px) rotate(-6deg)}}
+.breeze{position:fixed;inset:0;z-index:40;background:#000;display:flex;flex-direction:column;animation:sheetIn .28s cubic-bezier(.2,.8,.2,1)}
+.breeze-bar{display:flex;align-items:center;gap:8px;padding:calc(6px + env(safe-area-inset-top)) 12px 6px;background:var(--bg);border-bottom:1px solid var(--line)}
+.breeze-bar .bk{min-height:48px;padding:0 14px 0 8px;border-radius:999px;background:#1a1f27;border:1px solid var(--line);display:inline-flex;align-items:center;gap:4px;font-weight:600}
+.breeze-bar .bk svg{width:20px;height:20px;transform:scaleX(-1)}
+.breeze-bar .nm{flex:1;font-weight:700;font-size:1.1rem;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.breeze iframe{flex:1;width:100%;border:0;background:#000}
 @keyframes r{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (prefers-contrast: more){:root{--line:#7d8a9c;--mut:#e3e8ef}}
 </style>
 </head>
 <body>
-<div class="splash" id="splash" aria-hidden="true"><svg viewBox="100 40 312 422" aria-hidden="true"><defs><linearGradient id="ug2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#ffc24d"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug2)" stroke-width="58" stroke-linecap="round"/><g class="lid"><g transform="rotate(-10 112 160)"><rect x="180" y="58" width="30" height="64" rx="10" fill="#e0952e"/><rect x="302" y="58" width="30" height="64" rx="10" fill="#e0952e"/><rect x="112" y="112" width="288" height="48" rx="16" fill="#ffc24d"/></g></g></svg><b>Unplug</b></div>
+<div class="splash" id="splash" aria-hidden="true"><svg viewBox="100 40 312 422" aria-hidden="true"><defs><linearGradient id="ug2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#ffc24d"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug2)" stroke-width="58" stroke-linecap="round"/><g class="lid"><g transform="rotate(-10 112 160)"><rect x="180" y="58" width="30" height="64" rx="10" fill="#e0952e"/><rect x="302" y="58" width="30" height="64" rx="10" fill="#e0952e"/><rect x="112" y="112" width="288" height="48" rx="16" fill="#ffc24d"/></g></g><g class="spk" stroke="#ffd28a" stroke-width="16" stroke-linecap="round"><path d="M92 170 l-34 -16"/><path d="M96 214 l-38 4"/><path d="M420 150 l34 -20"/><path d="M424 196 l38 0"/></g></svg><b>Unplug</b></div>
 <div class="app">
   <header class="top">
     <div class="brandRow"><span class="brand" aria-label="Unplug"><svg viewBox="100 40 312 422" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff8a3d"/><stop offset="1" stop-color="#ffc24d"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" stroke-width="58" stroke-linecap="round"/><g class="lid"><g transform="rotate(-10 112 160)"><rect x="180" y="58" width="30" height="64" rx="10" fill="#e0952e"/><rect x="302" y="58" width="30" height="64" rx="10" fill="#e0952e"/><rect x="112" y="112" width="288" height="48" rx="16" fill="#ffc24d"/></g></g></svg><span aria-hidden="true">nplug</span></span>
@@ -235,10 +250,10 @@ function setKey(k){CFG.key=k;LSset('unplug_key',k||null)}
 function toast(t){document.querySelector('.toast')?.remove();const e=document.createElement('div');e.className='toast';e.setAttribute('role','status');e.textContent=t;document.body.append(e);$('live').textContent=t;setTimeout(()=>e.remove(),2600)}
 
 async function loadDevices(){
-  if(!CFG.key||busy)return;busy=true;$('refBtn').setAttribute('aria-busy','true');
+  if(!CFG.key||busy)return;busy=true;$('refBtn').setAttribute('aria-busy','true');document.querySelector('.brand').classList.add('busy');
   try{const j=await api('/devices');DEVS=j.devices||[];LSset('unplug_devs',JSON.stringify(DEVS));render()}
   catch(e){if(CFG.key)toast(e.message)}
-  finally{busy=false;$('refBtn').removeAttribute('aria-busy')}
+  finally{busy=false;$('refBtn').removeAttribute('aria-busy');document.querySelector('.brand').classList.remove('busy')}
 }
 async function loadSched(){if(!CFG.key)return;try{const j=await api('/schedules');SCHED=j.schedules||[]}catch(e){}}
 async function send(d,cmds){
@@ -291,11 +306,24 @@ function sheet(title,html,init){
   s.querySelector('#shT').focus();init&&init(s.querySelector('.sheet'),close);return close;
 }
 
+/* ---------- AC: the full Breeze remote, inside Unplug ---------- */
+function openBreeze(d){
+  if(!LS('kor_key'))LSset('kor_key',CFG.key);
+  LSset('kor_dev',d.id);
+  const w=document.createElement('div');w.className='breeze';w.setAttribute('role','dialog');w.setAttribute('aria-modal','true');w.setAttribute('aria-label',dname(d));
+  w.innerHTML=`<div class="breeze-bar"><button class="bk" id="bzB">${svg('chev')}חזרה</button><span class="nm">${esc(dname(d))}</span><button class="icbtn" id="bzM" aria-label="תזמונים, חדר ופרטים">${svg('clock')}</button></div><iframe src="/kor/?in=unplug" title="Breeze - שליטה במזגן" allow="clipboard-write"></iframe>`;
+  const close=()=>{w.remove();document.querySelector('.app').removeAttribute('aria-hidden');refreshOne(d.id);loadSched()};
+  w.querySelector('#bzB').onclick=close;w.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  w.querySelector('#bzM').onclick=()=>{close();openDevice(d,true)};
+  document.body.append(w);document.querySelector('.app').setAttribute('aria-hidden','true');w.querySelector('#bzB').focus();
+}
 /* ---------- device sheet ---------- */
 let OPEN=null;
 function refreshOpen(d){if(OPEN&&OPEN.id===d.id)OPEN.draw(d)}
 const SKIP=new Set(['colour_data','colour_data_v2','scene_data','scene_data_v2','music_data','control_data','fault','countdown_left']);
-function openDevice(d){
+const AC=new Set(['kt','ktkzq','kts']);
+function openDevice(d,generic){
+  if(!generic&&AC.has(d.category))return openBreeze(d);
   const close=sheet(esc(dname(d)),`<div id="dBody"></div>`,(el)=>{
     const body=el.querySelector('#dBody');body.style.cssText='display:flex;flex-direction:column;gap:14px';
     OPEN={id:d.id,draw:dd=>draw(dd)};
@@ -523,7 +551,7 @@ function openAdd(){
 }
 
 /* ---------- connect ---------- */
-function linkOk(k){setKey(k);document.querySelector('.scrim')?.remove();document.querySelector('.app').removeAttribute('aria-hidden');toast('מחובר');loadDevices();loadSched()}
+function linkOk(k){setKey(k);if(!LS('kor_key'))LSset('kor_key',k);document.querySelector('.scrim')?.remove();document.querySelector('.app').removeAttribute('aria-hidden');toast('מחובר');loadDevices();loadSched()}
 function openConnect(){
   sheet('התחברות',`<p>בוחרים דרך אחת. מספיק פעם אחת.</p>
     <button class="btn pri wide" id="cR">יש לי קוד שחזור מ-Breeze</button>
@@ -567,7 +595,7 @@ function applyPrefs(){document.documentElement.style.setProperty('--ts',(LS('unp
 document.querySelectorAll('nav.bar button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;render();if(TAB==='sched')loadSched().then(render);window.scrollTo(0,0)});
 $('refBtn').onclick=()=>{loadDevices();loadSched()};
 $('addBtn').onclick=openAdd;
-applyPrefs();render();setTimeout(()=>{const sp=$('splash');sp.classList.add('out');setTimeout(()=>sp.remove(),450)},matchMedia('(prefers-reduced-motion: reduce)').matches?0:900);
+applyPrefs();render();setTimeout(()=>{const sp=$('splash');sp.classList.add('out');setTimeout(()=>sp.remove(),450)},matchMedia('(prefers-reduced-motion: reduce)').matches?0:1500);
 if(CFG.key){LSset('unplug_key',CFG.key);loadDevices();loadSched()}else openConnect();
 setInterval(()=>{if(document.visibilityState==='visible'&&CFG.key&&!document.querySelector('.scrim [type=range]:active'))loadDevices()},30000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&CFG.key){loadDevices();loadSched()}});
