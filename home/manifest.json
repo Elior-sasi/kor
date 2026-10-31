@@ -1,0 +1,12 @@
+{
+  "name": "Unplug",
+  "short_name": "Unplug",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/kor/home/",
+  "scope": "/kor/home/",
+  "display": "standalone",
+  "background_color": "#0a0f14",
+  "theme_color": "#0a0f14",
+  "icons": [{ "src": "/kor/home/icon.png?v=1", "sizes": "512x512", "type": "image/png", "purpose": "any" }]
+}
