@@ -197,6 +197,39 @@ def _devices(sess, ref, only_id=None):
     return devs
 
 
+def _homes(sess, ref):
+    """Smart Life homes + the room of every device, for Unplug's home/room tabs."""
+    homes, where = [], {}
+    if sess["mode"] == "share":
+        api = _share_api(sess, ref)
+        for home in _share_ok(api.get("/v1.0/m/life/users/homes")) or []:
+            hid = str(home.get("ownerId") or home.get("homeId") or home.get("id"))
+            homes.append({"id": hid, "name": home.get("name", "")})
+            for it in _share_ok(api.get("/v1.0/m/life/ha/home/devices", {"homeId": hid})) or []:
+                room = None
+                try:
+                    r = api.get(f"/v1.0/m/thing/ha/{it['id']}/room")
+                    if r and r.get("success") and r.get("result"):
+                        room = {"id": str(r["result"].get("roomId") or r["result"].get("id") or ""), "name": r["result"].get("name", "")}
+                except Exception:  # noqa: BLE001
+                    pass
+                where[it["id"]] = {"home": hid, "room": room}
+    else:
+        d = sess["dev"]
+        uid = (_dev_call(d, "GET", "/v2.0/cloud/thing/device?page_size=1") or [{}])[0].get("uid", "")
+        for home in (_dev_call(d, "GET", f"/v1.0/users/{uid}/homes") or []) if uid else []:
+            hid = str(home.get("home_id"))
+            homes.append({"id": hid, "name": home.get("name", "")})
+            rooms = {}
+            for rm in (_dev_call(d, "GET", f"/v1.0/homes/{hid}/rooms") or {}).get("rooms", []):
+                rooms[str(rm.get("room_id"))] = rm.get("name", "")
+                for dv in _dev_call(d, "GET", f"/v1.0/homes/{hid}/rooms/{rm.get('room_id')}/devices") or []:
+                    where[dv.get("id")] = {"home": hid, "room": {"id": str(rm.get("room_id")), "name": rm.get("name", "")}}
+            for dv in _dev_call(d, "GET", f"/v1.0/homes/{hid}/devices") or []:
+                where.setdefault(dv.get("id"), {"home": hid, "room": None})
+    return {"homes": homes, "where": where}
+
+
 def _h(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
@@ -709,6 +742,8 @@ def _route(req, path: str, body: dict):
             return {"resp": "ERR " + str(e)[:300]}
     if path == "/devices":
         return {"mode": sess["mode"], "devices": _devices(sess, ref)}
+    if path == "/homes":
+        return _homes(sess, ref)
     if path == "/device":
         did = body.get("id") or req.args.get("id", "")
         devs = _devices(sess, ref, did)
