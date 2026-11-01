@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="8.6">
+<meta name="app-version" content="8.7">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -142,6 +142,20 @@ body{position:fixed;inset:0;width:100%}
 .tsum b{color:var(--fg);font-weight:500;font-family:var(--f-num)}
 .th-now{font-size:13px;color:var(--muted);line-height:1.5}
 .th-now b{color:var(--fg);font-family:var(--f-num);font-weight:500}
+
+/* Device settings follow the new flat Breeze surfaces. */
+.device-settings{background:var(--fill-2);border-radius:22px;overflow:hidden;flex-shrink:0}
+.ds-control{display:flex;flex-direction:column;gap:14px;padding:18px 16px;border-bottom:1px solid var(--line);font-size:1rem}
+.ds-control:last-child{border-bottom:0}
+.ds-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.ds-head label,.ds-head span{flex:1;min-width:0;overflow-wrap:anywhere}
+.ds-head output{color:var(--accent);font-variant-numeric:tabular-nums}
+.ds-head .sw{flex:none}
+.ds-control select{width:100%;min-width:0;min-height:48px;border:0;border-radius:14px;padding:10px 12px;background:var(--fill);color:var(--fg);font:inherit}
+.ds-step{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:8px;direction:ltr}
+.ds-step button{width:48px;height:48px;border:0;border-radius:50%;background:var(--fill);color:var(--fg);font-size:26px}
+.ds-step input{width:100%;min-width:0;margin:0;height:44px;accent-color:var(--accent)}
+.ds-empty{padding:18px}
 </style>
 <style>
 .pill{cursor:pointer}
@@ -526,6 +540,7 @@ b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};r.appendCh
     </div>
     <div class="top-r">
       <button class="pill" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">לא מחובר</span></button>
+      <button class="menu-btn" id="deviceSettingsBtn" aria-label="הגדרות המכשיר"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--bg)"/><circle cx="15" cy="17" r="3" fill="var(--bg)"/></svg></button>
       <button class="menu-btn" id="menuBtn" aria-label="תפריט"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
   </header>
@@ -939,10 +954,10 @@ function sheet(html,init){
   const close=()=>{sh.style.transition='transform .22s ease,opacity .22s';sh.style.transform='translateY(110%)';sc.style.transition='opacity .22s';sc.style.opacity='0';setTimeout(()=>sc.remove(),220)};
   sc.onclick=e=>{if(e.target===sc)close()};sh.querySelector('.sheet-x').onclick=()=>{buzz();close()};
   let y0=null,dy=0;
-  sh.addEventListener('touchstart',e=>{if(sh.scrollTop>0||e.target.closest('.wheel'))return;y0=e.touches[0].clientY;dy=0;sh.style.transition='none'},{passive:true});
+  sh.addEventListener('touchstart',e=>{if(sh.scrollTop>0||e.target.closest('.wheel,input,select,button'))return;y0=e.touches[0].clientY;dy=0;sh.style.transition='none'},{passive:true});
   sh.addEventListener('touchmove',e=>{if(y0===null)return;dy=Math.max(0,e.touches[0].clientY-y0);if(dy>0)sh.style.transform=`translateY(${dy}px)`},{passive:true});
   sh.addEventListener('touchend',()=>{if(y0===null)return;y0=null;if(dy>90)close();else{sh.style.transition='transform .2s';sh.style.transform=''}});
-  sh.addEventListener('touchmove',e=>{if(sh.classList.contains('fits')&&e.cancelable&&!e.target.closest('.wheel'))e.preventDefault()},{passive:false});
+  sh.addEventListener('touchmove',e=>{if(sh.classList.contains('fits')&&e.cancelable&&!e.target.closest('.wheel,input,select,button'))e.preventDefault()},{passive:false});
   const fit=()=>sh.classList.toggle('fits',sh.scrollHeight<=sh.clientHeight+1);
   init&&init(sc.querySelector('.sheet'),close);fit();
   try{new MutationObserver(()=>requestAnimationFrame(fit)).observe(sh,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']})}catch(e){}
@@ -1039,6 +1054,54 @@ function logout(silent){
   CFG.key='';keySave(null);LSset('kor_dev',null);linked=false;DEV=null;CAP=null;connState='off';
   S=Object.assign({},DEMO);buildControls();render();
 }
+
+/* Every writable device setting, including enums and integers omitted by toggle tiles. */
+const DEVICE_SETTING_NAMES={relay_status:'אחרי הפסקת חשמל',light_mode:'נורית חיווי',countdown:'טיימר מובנה',countdown_1:'טיימר מובנה',countdown_set:'טיימר מובנה',temp_unit_convert:'יחידת טמפרטורה',temp_unit:'יחידת טמפרטורה',sleep:'מצב לילה',display:'תצוגה',eco:'חסכוני'};
+const DEVICE_SETTING_VALUES={power_off:'כבוי',power_on:'דלוק',last:'כמו לפני',memory:'כמו לפני',on:'דלוק',off:'כבוי',none:'כבויה',relay:'לפי מצב',pos:'הפוך',c:'צלזיוס',f:'פרנהייט',auto:'אוטומטי',low:'נמוך',middle:'בינוני',mid:'בינוני',high:'גבוה'};
+const deviceSettingName=f=>DEVICE_SETTING_NAMES[f.code]||EXTRA_HE[f.code]?.[0]||TOGS.find(t=>t.codes.includes(f.code))?.t||f.name||f.code;
+const deviceSettingValue=v=>DEVICE_SETTING_VALUES[v]||String(v);
+function deviceSettingsFunctions(){
+  if(!DEV||!CAP)return [];
+  const main=new Set([CAP.power,CAP.temp?.code,CAP.mode?.code,CAP.fan?.code,CAP.vane?.code]);
+  return (DEV.functions||[]).filter(f=>!main.has(f.code)&&['Boolean','Enum','Integer'].includes(f.type));
+}
+function deviceSettingFormat(f,raw){
+  const v=f.values||{},n=Number(raw)/10**(+v.scale||0),unit=v.unit||'';
+  if(/countdown/.test(f.code)&&(!unit||unit==='s'))return n?Math.floor(n/3600)+' שע׳ '+Math.floor(n%3600/60)+' דק׳':'כבוי';
+  return n+(unit?' '+({'℃':'°C','s':'שנ׳','min':'דק׳'}[unit]||unit):'');
+}
+function openDeviceSettings(){
+  const fs=deviceSettingsFunctions();
+  sheet('<h3>הגדרות המכשיר</h3><p>'+esc(DEV?.name||'Breeze')+'</p><div class="device-settings" id="deviceSettingsBody"></div>',el=>{
+    const body=el.querySelector('#deviceSettingsBody');
+    const draw=()=>{
+      body.innerHTML=fs.length?fs.map((f,i)=>{
+        const val=DEV.status?.[f.code],name=esc(deviceSettingName(f)),id='ds'+i;
+        if(f.type==='Boolean')return `<div class="ds-control"><div class="ds-head"><span id="${id}L">${name}</span><button class="sw" id="${id}" aria-pressed="${val===true}" aria-labelledby="${id}L"></button></div></div>`;
+        if(f.type==='Enum'){const range=f.values?.range||[];return `<div class="ds-control"><label for="${id}">${name}</label><select id="${id}">${val==null?'<option value="" disabled selected>בחר</option>':''}${range.map(v=>`<option value="${esc(v)}"${val===v?' selected':''}>${esc(deviceSettingValue(v))}</option>`).join('')}</select></div>`}
+        const v=f.values||{},min=Number(v.min??0),max=Number(v.max??100),step=Number(v.step)||1;
+        return `<div class="ds-control"><div class="ds-head"><label for="${id}">${name}</label><output id="${id}V">${esc(deviceSettingFormat(f,val??min))}</output></div><div class="ds-step"><button data-step="-1" data-index="${i}" aria-label="הפחתה ${name}">−</button><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${val??min}" aria-valuetext="${esc(deviceSettingFormat(f,val??min))}"><button data-step="1" data-index="${i}" aria-label="הוספה ${name}">+</button></div></div>`;
+      }).join(''):'<p class="ds-empty">'+(DEV?'אין למכשיר הזה הגדרות נוספות. מצב, טמפרטורה ומאוורר נמצאים במסך הראשי.':'חבר מזגן כדי לראות את ההגדרות שהוא תומך בהן.')+'</p>';
+      fs.forEach((f,i)=>{
+        const input=body.querySelector('#ds'+i);
+        const save=async value=>{
+          if(!linked||!DEV||DEV.online===false)return toast('המזגן אינו מחובר');
+          const device=DEV;body.querySelectorAll('button,input,select').forEach(e=>e.disabled=true);
+          try{await api('/command',{id:device.id,commands:[{code:f.code,value}]});device.status={...device.status,[f.code]:value};if(DEV===device){readStatus(device.status);cacheDev();render()}toast('נשמר')}
+          catch(err){toast('לא נשמר: '+netMsg(err))}
+          finally{draw()}
+        };
+        if(f.type==='Boolean'){input.onclick=()=>save(!(DEV.status?.[f.code]===true));return}
+        if(f.type==='Enum'){input.onchange=()=>save(input.value);return}
+        const show=()=>{const t=deviceSettingFormat(f,+input.value);body.querySelector('#ds'+i+'V').textContent=t;input.setAttribute('aria-valuetext',t)};
+        input.oninput=show;input.onchange=()=>save(+input.value);
+        body.querySelectorAll(`[data-index="${i}"]`).forEach(b=>b.onclick=()=>{const n=Math.max(+input.min,Math.min(+input.max,+input.value+(+input.step)*Number(b.dataset.step)));if(n===+input.value)return;input.value=n;show();save(n)});
+      });
+    };draw();
+  });
+}
+$('deviceSettingsBtn').onclick=()=>{buzz();openDeviceSettings()};
+
 function openSettings(devs){
   const list=devs||[];
   sheet(`<h3>${linked?'החיבור':'מצב הדגמה'}</h3>
@@ -1128,13 +1191,14 @@ function openMenu(){
   const row=(id,ic,t,sub)=>`<button class="item" data-go="${id}">${svg(ic)}<div class="grow"><b>${t}</b><span>${sub||''}</span></div></button>`;
   sheet(`<h3>תפריט</h3><div class="menu-list">
     ${linked&&CAP?row('timer',MI.timer,'טיימר',timerLbl()?(S.timerPower?'הדלקה בעוד ':'כיבוי בעוד ')+timerLbl():'לא פעיל')+row('sched',MI.sched,'תזמונים',EXTRA.sched)+row('siri',MI.siri,'Siri ומיקום','קיצורי דרך')+row('stats',MI.stats,'סטטיסטיקה',EXTRA.stats)+row('thermo',MI.thermo,'תרמוסטט',EXTRA.thermo||'כבוי')+`<div class="item" id="pushRow">${svg(MI.bell)}<div class="grow"><b>התראות לטלפון</b><span>תקלות ותרמוסטט</span></div><button class="sw" id="pushSw" aria-pressed="false" aria-label="התראות לטלפון"></button></div>`:''}
+    ${row('device',MI.conn,'הגדרות המכשיר','פונקציות ואפשרויות נוספות')}
     ${row('conn',MI.conn,'החיבור',linked?'מחובר':'לא מחובר')}
   </div><p style="text-align:center;font-size:12px;margin-top:4px">Breeze ${(document.querySelector('meta[name="app-version"]')||{}).content||''}</p>`,(el,close)=>{const ps=el.querySelector('#pushSw');if(ps){pushIsOn().then(v=>ps.setAttribute('aria-pressed',v));
     el.querySelector('#pushRow').onclick=async()=>{const v=ps.getAttribute('aria-pressed')!=='true';ps.setAttribute('aria-pressed',v);buzz();
       try{if(v){await pushEnable();await api('/notify/test').catch(()=>{});toast('התראות הופעלו - נשלחה התראת בדיקה')}else{await pushDisable();toast('התראות כובו')}}
       catch(err){ps.setAttribute('aria-pressed',!v);toast(err.message||String(err))}}}
     el.querySelector('.menu-list').onclick=e=>{const b=e.target.closest('[data-go]');if(!b)return;buzz();
-    ({timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,diag:openDiag,thermo:openThermo,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
+    ({device:openDeviceSettings,timer:openTimer,sched:openSchedules,siri:()=>openSiri(false),stats:openStats,diag:openDiag,thermo:openThermo,conn:()=>linked?openSettings(DEV?[DEV]:[]):openConnect()})[b.dataset.go]()}});
 }
 $('menuBtn').onclick=openMenu;
 const isSwingV=v=>/^(auto|swing|all|full)$/i.test(String(v));
