@@ -689,6 +689,14 @@ def _route(req, path: str, body: dict):
         res = _push_route(path, body, ref)
         if res is not None:
             return res
+    if path == "/meta":
+        return {"meta": sess.get("ui_meta")}
+    if path == "/meta/save":
+        m = body.get("meta")
+        if isinstance(m, dict) and len(json.dumps(m)) < 400_000:
+            ref.update({"ui_meta": m})
+            return {"saved": True}
+        return {"saved": False}
     if path == "/prefs":
         ref.update({"device": body.get("device"), "track": True})
         return {"saved": True}
