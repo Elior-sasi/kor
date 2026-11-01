@@ -812,7 +812,7 @@ def _route(req, path: str, body: dict):
     if path == "/homes":
         return _homes(sess, ref)
     if path == "/guard":
-        return {"guard": sess.get("guard") or {"rules": []}}
+        return {"guard": sess.get("guard") or {"rules": []}, "state": sess.get("guard_state") or {}}
     if path == "/guard/save":
         rules = []
         for r in (body.get("rules") or [])[:30]:
