@@ -601,7 +601,7 @@ body::before,.glow{display:none!important}
 </style>
 <script>/* Unplug embed: back button in Breeze's own header, closes the Unplug overlay */
 (function(){if(!/[?&]in=unplug/.test(location.search))return;document.documentElement.classList.add('in-unplug');
-addEventListener('DOMContentLoaded',()=>{const r=document.querySelector('header.top .top-r');if(!r)return;const b=document.createElement('button');b.className='menu-btn';b.id='unplugBack';b.setAttribute('aria-label','חזרה ל-Unplug');
+addEventListener('DOMContentLoaded',()=>{const r=document.querySelector('header.top .top-r');if(!r)return;const b=document.createElement('button');b.className='menu-btn';b.id='unplugBack';b.setAttribute('aria-label','חזרה ל-Smartly');
 b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};r.appendChild(b)})})();</script>
 </head><body>
