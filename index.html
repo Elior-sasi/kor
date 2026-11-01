@@ -599,11 +599,22 @@ body::before,.glow{display:none!important}
 :focus-visible{outline:3px solid #ffc48a;outline-offset:3px}
 @media(max-width:380px){.top{flex-wrap:wrap}.top h1{font-size:1.5rem}.top-r{margin-inline-start:auto}}
 </style>
-<script>/* Unplug embed: back button in Breeze's own header, closes the Unplug overlay */
-(function(){if(!/[?&]in=unplug/.test(location.search))return;document.documentElement.classList.add('in-unplug');
-addEventListener('DOMContentLoaded',()=>{const r=document.querySelector('header.top .top-r');if(!r)return;const b=document.createElement('button');b.className='menu-btn';b.id='unplugBack';b.setAttribute('aria-label','חזרה ל-HomeOn');
+<script>/* Breeze lives inside HomeOn now: opened directly, it moves to HomeOn and opens the AC there */
+(function(){var inU=/[?&]in=unplug/.test(location.search);window.IN_HOMEON=inU;
+if(!inU&&window.top===window&&!/[?&]standalone/.test(location.search)){var d='';try{d=localStorage.getItem('kor_dev')||''}catch(e){}location.replace('/unplug/'+(d?'#dev='+encodeURIComponent(d):''));return}
+if(!inU)return;document.documentElement.classList.add('in-unplug');
+addEventListener('DOMContentLoaded',()=>{const h=document.querySelector('header.top');if(!h)return;const b=document.createElement('button');b.className='menu-btn';b.id='unplugBack';b.setAttribute('aria-label','חזרה ל-HomeOn');
 b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
-b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};r.appendChild(b)})})();</script>
+b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};h.insertBefore(b,h.firstChild);
+/* swipe from the right edge (RTL back) closes it, like going back in HomeOn */
+let x0=null,y0=0;addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.clientX>innerWidth-28||t.clientX<28?t.clientX:null;y0=t.clientY},{passive:true});
+addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];if(Math.abs(t.clientX-x0)>90&&Math.abs(t.clientY-y0)<60)b.onclick();x0=null},{passive:true})})})();</script>
+<style>
+.in-unplug #conn,.in-unplug [data-go="siri"],.in-unplug [data-go="conn"],.in-unplug #pushRow,.in-unplug .menu-list+p{display:none!important}
+.in-unplug header.top{gap:10px}.in-unplug header.top>div:nth-child(2){flex:1;min-width:0}
+.in-unplug #unplugBack{flex:none!important;width:44px!important;height:44px!important;border-radius:50%!important;background:#2c2c2e!important;color:#fff!important;display:grid!important;place-items:center}
+.in-unplug #unplugBack svg{width:22px;height:22px}
+</style>
 </head><body>
 <div class="app" id="app">
   <header class="top">
@@ -1036,6 +1047,7 @@ function sheet(html,init){
   addEventListener('resize',fit);return close;
 }
 async function showRecover(first){
+  if(first&&window.IN_HOMEON)return;
   let code;try{code=(await api('/recover/create')).code}catch(e){if(!first)toast(netMsg(e));return}
   sheet(`<h3>קוד שחזור</h3>
     <p>אם האייפון ימחק את החיבור, אפשר להתחבר שוב עם הקוד הזה בלי לסרוק QR. שמור אותו, למשל בפתקים.</p>
