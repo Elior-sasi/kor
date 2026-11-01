@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="app-version" content="8.7">
+<meta name="app-version" content="9.0">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
 <link rel="manifest" href="/kor/manifest.json?v=2">
 <title>Breeze</title>
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: light)">
 <style>
 /* Layout: one phone screen - status bar, big tinted dial, mode rail, fan row, toggle grid, profiles. Accent shifts with the AC mode. */
 :root{
@@ -526,6 +526,78 @@ html,body{height:100%;overflow:hidden}
 .ctl-row .step{position:static!important;transform:none!important;flex:0 0 auto;width:52px!important;height:52px!important}
 .ctl-row .air{position:static!important;transform:none!important;flex:0 1 auto}
 .hero{margin-bottom:-38px!important}
+
+/* Unplug family: one visual language in the embedded and standalone remote. */
+@font-face{font-family:Rubik;src:url('/unplug/fonts/rubik-hebrew-400-normal.woff2') format('woff2');font-weight:400;font-display:swap;unicode-range:U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+@font-face{font-family:Rubik;src:url('/unplug/fonts/rubik-hebrew-500-normal.woff2') format('woff2');font-weight:500 600;font-display:swap;unicode-range:U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+@font-face{font-family:Rubik;src:url('/unplug/fonts/rubik-hebrew-700-normal.woff2') format('woff2');font-weight:700 800;font-display:swap;unicode-range:U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F}
+:root{color-scheme:dark;--bg:#000;--fg:#fff;--surface:#1c1c1e;--surface-2:#2c2c2e;--fill:#1c1c1e;--fill-2:#2c2c2e;--muted:#b4bdca;--line:#ffffff14;--off:#8e8e93;--accent:#ff9a3d;--accent-soft:#ff9a3d24;--f-body:Rubik,system-ui,-apple-system,sans-serif;--f-num:Rubik,system-ui,sans-serif}
+html,body{background:#000!important;color:#fff;color-scheme:dark}
+body{font:400 1.0625rem/1.45 var(--f-body)}
+body::before,.glow{display:none!important}
+.app{gap:14px!important;padding-top:calc(12px + env(safe-area-inset-top,0px))!important;padding-left:max(16px,calc((100vw - 608px)/2))!important;padding-right:max(16px,calc((100vw - 608px)/2))!important}
+.top{gap:10px;align-items:center;min-height:64px}
+.top>div:first-child{min-width:0;flex:1}
+.top h1,.brand{font-family:var(--f-body);font-size:1.75rem;line-height:1.2;letter-spacing:-.02em;background:none;-webkit-text-fill-color:#fff;color:#fff;direction:rtl;overflow-wrap:anywhere}
+.device-subtitle{font-size:.85rem;color:var(--muted);margin-top:4px}
+.top-r{gap:0;flex-shrink:0}
+.menu-btn{width:44px!important;height:44px!important;min-height:44px;background:transparent!important;border:0!important;border-radius:50%;color:#fff;box-shadow:none!important}
+.menu-btn svg{width:23px;height:23px}
+#unplugBack{color:var(--accent)}
+.pill{max-width:130px;font-size:.8rem;padding:6px 8px;border-radius:14px}
+.hero{background:var(--fill);border-radius:22px;padding:16px 12px 0;margin:0!important;overflow:hidden;flex-shrink:0;gap:0}
+.ac-product{width:128px;height:54px;object-fit:contain;margin-bottom:0;filter:none;opacity:.95}
+.dial{min-width:170px;margin-top:-8px}
+.track{stroke:#3a3a3c!important;stroke-width:12}
+.val{stroke-width:12}
+.tick{stroke:#b4bdca!important;opacity:.35}
+.knob{fill:#fff!important;filter:none}
+.temp{font-family:var(--f-num);font-weight:500;letter-spacing:-.04em;color:#fff!important}
+.app.is-off .temp{color:#fff!important}
+.mode-lbl{color:#ffc48a!important;font-weight:600}
+.app.is-off .mode-lbl{color:#b4bdca!important}
+.indoor,.indoor .arr{color:#b4bdca!important}
+.ctl-row{gap:8px;margin-top:0;flex-shrink:0}
+.ctl-row .step{width:48px!important;height:48px!important;background:var(--fill)!important;border-radius:50%;color:#fff;font-weight:600}
+.air{min-height:44px!important;font-size:.85rem!important;border-radius:14px!important}
+.air[aria-pressed=true]{background:#ff9a3d24!important;color:#ffc48a!important}
+.power-row{gap:10px;flex-shrink:0}
+.power,.app.is-off .power{min-height:54px;background:#ff9a3d!important;color:#1f0e00!important;border:0!important;border-radius:16px!important;padding:14px!important;font-size:1.05rem;font-weight:600;box-shadow:none!important}
+.turbo{width:76px!important;border-radius:16px!important;font-size:.85rem}
+.sec{flex-shrink:0}.sec h2{font-size:1.15rem;color:#fff;font-weight:700;margin:6px 2px 10px!important}
+.profiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.prof{padding:16px 12px!important;min-height:80px;border-radius:22px;align-items:flex-start;text-align:start;gap:10px!important}
+.prof b{font-size:1rem!important;font-weight:600}.prof svg{color:#b4bdca}
+.prof[aria-pressed=true]{background:linear-gradient(160deg,#3d2512,#1c1c1e 80%)!important;box-shadow:inset 0 0 0 1.5px #ff9a3d66!important}
+.prof[aria-pressed=true] b,.prof[aria-pressed=true] svg{color:#ffc48a!important}
+.more{border-radius:22px;flex-shrink:0}
+.more summary{padding:18px 16px!important;font-size:1.05rem;font-weight:600}
+.more-body{padding:0 12px 14px}
+#toggles{border-radius:16px}
+#toggles .tog .t{font-size:1rem;font-weight:500}
+#toggles .tog[aria-pressed=true]::after{background-color:#ff9a3d}
+#toggles .tog[aria-pressed=true] svg{background:#ff9a3d24!important;color:#ffc48a!important}
+.timer-line{font-size:.95rem;color:#ffc48a!important;border-radius:16px;flex-shrink:0}
+.bottom-bar{left:max(16px,calc((100vw - 608px)/2))!important;right:max(16px,calc((100vw - 608px)/2))!important;border-radius:28px!important;background:rgba(28,28,30,.94)!important;border:1px solid #ff9a3d33!important;box-shadow:0 10px 30px #0009!important;padding:6px!important;gap:6px!important}
+.bottom-bar::after{display:none!important}
+.bb{border-radius:22px!important;min-height:60px}
+.bb-ic,.bb-t b{color:#ffc48a!important}.bb-t small{font-size:.8rem;color:var(--muted)}.bb-t b{font-size:1rem}
+.bb-dots i.on{background:#ff9a3d!important}
+.scrim{background:#0008!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+.sheet{max-width:620px;background:#1c1c1e!important;border:0!important;border-radius:38px!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:0 -10px 40px #000a!important}
+.sheet h3{font-family:var(--f-body);font-size:1.35rem;padding-inline-end:32px;color:#fff}
+.sheet p{font-size:.95rem;color:var(--muted)}
+.sheet .item,.sheet .pick button,.sheet .btn:not(.pri),.sheet .chip{background:#2c2c2e!important;color:#fff}
+.sheet .item{border-radius:18px;font-size:1rem;min-height:56px}
+.sheet .pick button{min-height:64px;border-radius:18px;font-size:1rem}
+.sheet .pick button[aria-pressed=true],.sheet .chip[aria-pressed=true],.sheet .btn.pri{background:#ff9a3d!important;color:#1f0e00!important}
+.sheet-x{width:44px;height:44px;top:12px;left:12px;background:#3a3a3c!important;color:#fff}
+.sheet input,.sheet select{font-family:var(--f-body);color:#fff!important;background:#3a3a3c!important}
+.sheet .ds-step button{background:#3a3a3c;color:#fff}
+.sheet .ds-head output{color:#ffc48a}
+.toast{background:#2c2c2e!important;color:#fff!important;border:1px solid #ffffff14!important;font-size:.95rem;max-width:calc(100% - 32px);white-space:normal}
+:focus-visible{outline:3px solid #ffc48a;outline-offset:3px}
+@media(max-width:380px){.top{flex-wrap:wrap}.top h1{font-size:1.5rem}.top-r{margin-inline-start:auto}}
 </style>
 <script>/* Unplug embed: back button in Breeze's own header, closes the Unplug overlay */
 (function(){if(!/[?&]in=unplug/.test(location.search))return;document.documentElement.classList.add('in-unplug');
@@ -536,7 +608,7 @@ b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};r.appendCh
 <div class="app" id="app">
   <header class="top">
     <div>
-      <h1 id="devName" class="brand">Breeze</h1>
+      <h1 id="devName" class="brand">מזגן</h1><div class="device-subtitle">מיזוג אוויר</div>
     </div>
     <div class="top-r">
       <button class="pill" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">לא מחובר</span></button>
@@ -547,7 +619,7 @@ b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};r.appendCh
   <button class="fault-bar" id="faultBar" hidden></button>
 
   <section class="hero">
-    <div class="glow"></div>
+    <img class="ac-product" src="/unplug/real/ac.png" alt="" aria-hidden="true"><div class="glow"></div>
     <div class="dial" id="dial" role="slider" aria-label="טמפרטורה" tabindex="0">
       <svg viewBox="0 0 300 300" aria-hidden="true">
         <g id="ticks"></g>
@@ -1417,8 +1489,8 @@ function renderConn(){
 }
 function render(){
   const m=MODES.find(x=>x.id===S.mode)||MODES[0];
-  const root=document.documentElement;root.style.setProperty('--accent',m.color);
-  const rgb=m.color.match(/\w\w/g).map(h=>parseInt(h,16));root.style.setProperty('--accent-soft',`rgba(${rgb},.15)`);
+  const root=document.documentElement;root.style.setProperty('--accent','#ff9a3d');
+  root.style.setProperty('--accent-soft','rgba(255,154,61,.15)');
   $('app').classList.toggle('is-off',!S.power);
   const fanOnly=S.mode==='fan';
   $('tempNum').textContent=fanOnly?'--':(Number.isInteger(S.temp)?S.temp:S.temp.toFixed(1));
@@ -1455,23 +1527,20 @@ function render(){
 // demo simulation only
 setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.indoor+=S.indoor>S.temp?-1:1;saveDemo();render()}},20000);
 
+(function appAppearance(){
+  const apply=()=>{let scale='100';try{const v=localStorage.getItem('unplug_ts');if(['100','115','130','150'].includes(v))scale=v}catch(e){}document.documentElement.style.fontSize=scale+'%'};
+  apply();addEventListener('storage',e=>{if(e.key==='unplug_ts')apply()});
+})();
 (function fitDial(){
   const dial=document.getElementById('dial'),more=document.getElementById('moreDet'),bar=document.getElementById('bottomBar');
   const fit=()=>{if(!dial||!more||!bar)return;
-    const sum=more.open?more.querySelector('summary'):more;const app0=document.getElementById('app');app0.style.setProperty('gap','12px','important');
-    app0.style.setProperty('padding-bottom',Math.ceil(app0.getBoundingClientRect().bottom-bar.getBoundingClientRect().top+10)+'px','important');const maxW=Math.min(dial.parentElement.clientWidth,370);
-    for(let k=0;k<3;k++){
-      const w=dial.getBoundingClientRect().width;
-      const slack=bar.getBoundingClientRect().top-12-(sum.getBoundingClientRect().bottom+(more.open?0:0));
-      const nw=Math.max(170,Math.min(maxW,Math.round(w+slack)));
-      if(Math.abs(nw-w)<2)break;
-      dial.style.setProperty('width',nw+'px','important');
-    }
-    const app=document.getElementById('app');app.style.setProperty('gap','12px','important');
-    const left=bar.getBoundingClientRect().top-12-sum.getBoundingClientRect().bottom;
-    if(left>4)app.style.setProperty('gap',Math.min(30,12+left/5)+'px','important');
-    app.scrollTop=more.open?app.scrollTop:0;
-    app.style.setProperty('overflow-y',(more.open||app.scrollHeight>app.clientHeight+1)?'auto':'hidden','important');
+    const app=document.getElementById('app');
+    const compact=innerHeight<740;
+    const width=Math.max(170,Math.min(dial.parentElement.clientWidth-24,compact?220:280));
+    dial.style.setProperty('width',width+'px','important');
+    app.style.setProperty('gap','14px','important');
+    app.style.setProperty('padding-bottom',Math.ceil(bar.getBoundingClientRect().height+32)+'px','important');
+    app.style.setProperty('overflow-y','auto','important');
   };
   more.addEventListener('toggle',()=>setTimeout(fit,30));
   document.addEventListener('touchmove',e=>{if(e.target.closest('.scrim'))return;
@@ -1490,7 +1559,7 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
   const chk=()=>fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{
     const m=t.match(/name="app-version" content="([\d.]+)"/);if(!m||m[1]===cur)return;
     let k='kor_upd_'+m[1];try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,'1')}catch(e){}
-    location.replace(location.pathname+'?v='+m[1]);
+    const next=new URL(location.href);next.searchParams.set('v',m[1]);location.replace(next.pathname+next.search+next.hash);
   }).catch(()=>{});
   chk();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')chk()});
 })();
