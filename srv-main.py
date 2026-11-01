@@ -301,8 +301,15 @@ def _tick():
                 pass
     if now.minute % 2 == 1:
         for snap in _db().collection("kor_sessions").where("guard_on", "==", True).stream():
+            sd = snap.to_dict()
             try:
-                _guard(snap, snap.to_dict())
+                if (sd.get("guard") or {}).get("rules"):
+                    _guard(snap, sd)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                if sd.get("home"):
+                    _home(snap, _sess_by_hash(snap.id)[0] or sd, now)
             except Exception:  # noqa: BLE001
                 pass
     return {"ran": ran, "errors": errs}
@@ -368,6 +375,141 @@ def _guard(snap, sess):
                 g["rem"] = True
         state[r["id"]] = g
     snap.reference.update({"guard_state": state})
+
+
+def _bulk(sess, ref, ids):
+    """Status + online for many devices in as few calls as possible."""
+    out = {}
+    ids = [i for i in dict.fromkeys(ids) if i]
+    if not ids:
+        return out
+    if sess["mode"] == "share":
+        api = _share_api(sess, ref)
+        for i in range(0, len(ids), 20):
+            for it in _share_ok(api.get("/v1.0/m/life/ha/devices/detail", {"devIds": ",".join(ids[i:i + 20])})) or []:
+                out[it["id"]] = {"online": bool(it.get("online", True)),
+                                 "status": {x["code"]: x["value"] for x in it.get("status", []) if "code" in x}}
+    else:
+        for d in ids:
+            try:
+                out[d] = {"online": True, "status": _status(sess, ref, d)}
+            except Exception:  # noqa: BLE001
+                pass
+    return out
+
+
+def _num(st, code, scale):
+    v = st.get(code)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return v / (10 ** int(scale or 0))
+
+
+def _home(snap, sess, now):
+    """HomeOn, every 2 minutes: energy use, offline alerts and if-then automations."""
+    h = sess.get("home") or {}
+    en, off, autos = h.get("energy") or {}, h.get("offline") or {}, [a for a in (h.get("autos") or []) if a.get("enabled", True)]
+    ids = []
+    if en.get("on"):
+        ids += [d["id"] for d in en.get("devs", [])]
+    if off.get("on"):
+        ids += [d["id"] for d in off.get("devs", [])]
+    for a in autos:
+        ids += [a.get("if", {}).get("device"), a.get("then", {}).get("device")]
+    if not ids:
+        return
+    data = _bulk(sess, snap.reference, ids)
+    hs = dict(sess.get("home_state") or {})
+    sid = snap.id
+    t = time.time()
+    # energy: watt-hours per device per day
+    if en.get("on"):
+        add = {}
+        for d in en.get("devs", []):
+            st = (data.get(d["id"]) or {}).get("status") or {}
+            w = _num(st, "cur_power", d.get("scale", 1))
+            if w and w > 0.5:
+                add[d["id"]] = firestore.Increment(round(w * 2 / 60, 3))
+        if add:
+            _db().collection("kor_energy").document(f"{sid}_{now.strftime('%Y-%m-%d')}").set(
+                {"sess": sid, "date": now.strftime("%Y-%m-%d"), "wh": add}, merge=True)
+    # offline / back online
+    if off.get("on"):
+        for d in off.get("devs", []):
+            info = data.get(d["id"])
+            if not info:
+                continue
+            k = "o_" + d["id"]
+            g = dict(hs.get(k) or {})
+            if not info["online"]:
+                g["n"] = int(g.get("n") or 0) + 1
+                if g["n"] >= 3 and not g.get("sent"):
+                    _notify(sid, {"title": f"{d.get('name') or 'מכשיר'} התנתק", "body": "כבר כמה דקות בלי חיבור. אולי הפסקת חשמל או בעיה ב-WiFi.", "tag": k, "url": "./#dev=" + d["id"]})
+                    g["sent"] = t
+            else:
+                if g.get("sent"):
+                    mins = int((t - g["sent"]) // 60) + 6
+                    _notify(sid, {"title": f"{d.get('name') or 'מכשיר'} חזר לרשת", "body": f"היה מנותק בערך {mins} דקות.", "tag": k, "url": "./#dev=" + d["id"]})
+                g = {}
+            hs[k] = g
+    # if-then automations, fired when the condition becomes true
+    for a in autos:
+        c, th = a.get("if") or {}, a.get("then") or {}
+        info = data.get(c.get("device"))
+        if not info:
+            continue
+        st = info["status"]
+        kind, ok = c.get("kind"), None
+        if kind in ("temp_above", "temp_below"):
+            v = _num(st, c.get("code") or "temp_current", c.get("scale", 0))
+            if v is not None:
+                ok = v > float(c.get("value", 0)) if kind == "temp_above" else v < float(c.get("value", 0))
+        elif kind in ("turns_on", "turns_off"):
+            v = st.get(c.get("code") or "switch")
+            if isinstance(v, bool):
+                ok = v if kind == "turns_on" else not v
+        elif kind in ("power_above", "power_below"):
+            v = _num(st, "cur_power", c.get("scale", 1))
+            if v is not None:
+                ok = v > float(c.get("value", 0)) if kind == "power_above" else v < float(c.get("value", 0))
+        if ok is None:
+            continue
+        k = "a_" + str(a.get("id"))
+        g = dict(hs.get(k) or {})
+        prev = g.get("ok")
+        if ok and prev is False and t - float(g.get("at") or 0) > 60 * int(a.get("cool", 10)):
+            try:
+                _send(sess, snap.reference, th["device"], th["cmds"])
+                g["at"] = t
+                if a.get("notify"):
+                    _notify(sid, {"title": a.get("name") or "אוטומציה", "body": a.get("text") or "הופעלה", "tag": k, "url": "./#dev=" + th["device"]})
+            except Exception:  # noqa: BLE001
+                pass
+        g["ok"] = ok
+        hs[k] = g
+    snap.reference.update({"home_state": hs})
+
+
+def _home_on(h):
+    h = h or {}
+    return bool((h.get("energy") or {}).get("on") or (h.get("offline") or {}).get("on") or any(a.get("enabled", True) for a in h.get("autos") or []))
+
+
+def _clean_home(h):
+    def devs(lst):
+        return [{"id": str(d.get("id")), "name": str(d.get("name") or "")[:60], "scale": int(d.get("scale") or 0)} for d in (lst or [])[:60] if d.get("id")]
+    en, off = h.get("energy") or {}, h.get("offline") or {}
+    autos = []
+    for a in (h.get("autos") or [])[:30]:
+        c, th = a.get("if") or {}, a.get("then") or {}
+        if not c.get("device") or not th.get("device") or not isinstance(th.get("cmds"), list):
+            continue
+        autos.append({"id": str(a.get("id") or secrets.token_hex(4)), "name": str(a.get("name") or "")[:80], "text": str(a.get("text") or "")[:120],
+                      "enabled": bool(a.get("enabled", True)), "notify": bool(a.get("notify")), "cool": max(1, min(1440, int(a.get("cool") or 10))),
+                      "if": {"device": str(c["device"]), "kind": str(c.get("kind") or ""), "code": str(c.get("code") or ""), "scale": int(c.get("scale") or 0), "value": float(c.get("value") or 0)},
+                      "then": {"device": str(th["device"]), "cmds": th["cmds"][:5]}})
+    return {"energy": {"on": bool(en.get("on")), "price": float(en.get("price") or 0.64), "devs": devs(en.get("devs"))},
+            "offline": {"on": bool(off.get("on")), "devs": devs(off.get("devs"))}, "autos": autos}
 
 
 FAULTS = ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"]
@@ -831,6 +973,22 @@ def _route(req, path: str, body: dict):
         return {"mode": sess["mode"], "devices": _devices(sess, ref)}
     if path == "/homes":
         return _homes(sess, ref)
+    if path == "/home":
+        return {"home": sess.get("home") or {}}
+    if path == "/home/save":
+        hm_ = _clean_home(body.get("home") or {})
+        ref.update({"home": hm_, "guard_on": _home_on(hm_) or any(r.get("enabled", True) for r in (sess.get("guard") or {}).get("rules", []))})
+        return {"saved": True}
+    if path == "/energy":
+        days = max(1, min(62, int(body.get("days") or 31)))
+        today_ = dt.datetime.now(TZ).date()
+        refs = [_db().collection("kor_energy").document(f"{ref.id}_{(today_ - dt.timedelta(days=i)).isoformat()}") for i in range(days)]
+        out = {}
+        for d in _db().get_all(refs):
+            if d.exists:
+                x = d.to_dict()
+                out[x["date"]] = x.get("wh", {})
+        return {"days": out}
     if path == "/guard":
         return {"guard": sess.get("guard") or {"rules": []}, "state": sess.get("guard_state") or {}}
     if path == "/guard/save":
@@ -842,7 +1000,7 @@ def _route(req, path: str, body: dict):
                               "pcode": str(r.get("pcode") or ""), "scale": int(r.get("scale") or 0), "enabled": bool(r.get("enabled", True)),
                               "expect": max(0, min(600, int(r.get("expect") or 0))), "remind": bool(r.get("remind"))})
         old = sess.get("guard_state") or {}
-        ref.update({"guard": {"rules": rules}, "guard_on": any(r["enabled"] for r in rules),
+        ref.update({"guard": {"rules": rules}, "guard_on": any(r["enabled"] for r in rules) or _home_on(sess.get("home")),
                     "guard_state": {r["id"]: old[r["id"]] for r in rules if r["id"] in old}})
         return {"saved": True, "count": len(rules)}
     if path == "/device":
