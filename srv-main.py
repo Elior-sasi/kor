@@ -345,15 +345,27 @@ def _guard(snap, sess):
                 continue
             w = raw / (10 ** int(r.get("scale") or 0))
             if w >= 8:
+                if g.get("end"):
+                    g = {}
                 g.setdefault("run", now)
                 g["low"] = 0
+                g["w"] = round(w)
             elif g.get("run"):
                 g["low"] = int(g.get("low") or 0) + 1
+                g["w"] = round(w)
                 if g["low"] >= 2 and now - g["run"] >= r["minutes"] * 60:
-                    _notify(snap.id, {"title": f"{name} סיים", "body": "הצריכה ירדה - נראה שהתוכנית נגמרה.", "tag": "guard-" + r["id"], "url": "./#dev=" + did})
-                    g = {}
+                    mins = int((now - g["run"]) // 60)
+                    exp = int(r.get("expect") or 0)
+                    if exp and mins < exp * 0.6:
+                        _notify(snap.id, {"title": f"{name} עצרה באמצע?", "body": f"הצריכה ירדה אחרי {mins} דק׳, מוקדם מהצפוי. כדאי לבדוק.", "tag": "guard-" + r["id"], "url": "./#dev=" + did})
+                    else:
+                        _notify(snap.id, {"title": f"{name} סיים", "body": "הצריכה ירדה - נראה שהתוכנית נגמרה.", "tag": "guard-" + r["id"], "url": "./#dev=" + did})
+                    g = {"end": now, "began": g["run"]}
                 elif g["low"] >= 6:
                     g = {}
+            elif g.get("end") and r.get("remind") and not g.get("rem") and now - g["end"] >= 30 * 60:
+                _notify(snap.id, {"title": f"{name}: הכביסה מחכה", "body": "סיימה לפני חצי שעה. לא לשכוח לפרוק.", "tag": "guard-" + r["id"], "url": "./#dev=" + did})
+                g["rem"] = True
         state[r["id"]] = g
     snap.reference.update({"guard_state": state})
 
@@ -819,8 +831,11 @@ def _route(req, path: str, body: dict):
             if r.get("device") and r.get("kind") in ("on_long", "done"):
                 rules.append({"id": str(r.get("id") or secrets.token_hex(4)), "device": str(r["device"]), "kind": r["kind"],
                               "minutes": max(1, min(24 * 60, int(r.get("minutes") or 20))), "name": str(r.get("name") or "")[:60],
-                              "pcode": str(r.get("pcode") or ""), "scale": int(r.get("scale") or 0), "enabled": bool(r.get("enabled", True))})
-        ref.update({"guard": {"rules": rules}, "guard_on": any(r["enabled"] for r in rules), "guard_state": {}})
+                              "pcode": str(r.get("pcode") or ""), "scale": int(r.get("scale") or 0), "enabled": bool(r.get("enabled", True)),
+                              "expect": max(0, min(600, int(r.get("expect") or 0))), "remind": bool(r.get("remind"))})
+        old = sess.get("guard_state") or {}
+        ref.update({"guard": {"rules": rules}, "guard_on": any(r["enabled"] for r in rules),
+                    "guard_state": {r["id"]: old[r["id"]] for r in rules if r["id"] in old}})
         return {"saved": True, "count": len(rules)}
     if path == "/device":
         did = body.get("id") or req.args.get("id", "")
