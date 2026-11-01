@@ -299,7 +299,63 @@ def _tick():
                 _watch(snap, sess, did, st, bool(on), mode, now, today)
             except Exception:  # noqa: BLE001
                 pass
+    if now.minute % 2 == 1:
+        for snap in _db().collection("kor_sessions").where("guard_on", "==", True).stream():
+            try:
+                _guard(snap, snap.to_dict())
+            except Exception:  # noqa: BLE001
+                pass
     return {"ran": ran, "errors": errs}
+
+
+POWER_CODES = ("switch", "switch_1", "switch_led", "power")
+
+
+def _guard(snap, sess):
+    """House guard, every 2 minutes: device left on too long, or a machine finished (power dropped)."""
+    rules = [r for r in (sess.get("guard") or {}).get("rules", []) if r.get("enabled", True)]
+    state = dict(sess.get("guard_state") or {})
+    now = time.time()
+    cache = {}
+    for r in rules:
+        did = r["device"]
+        if did not in cache:
+            try:
+                cache[did] = _status(sess, snap.reference, did)
+            except Exception:  # noqa: BLE001
+                cache[did] = None
+        st = cache[did]
+        if st is None:
+            continue
+        g = dict(state.get(r["id"]) or {})
+        name = r.get("name") or "מכשיר"
+        if r["kind"] == "on_long":
+            pc = r.get("pcode") or next((c for c in POWER_CODES if isinstance(st.get(c), bool)), None)
+            if pc and st.get(pc) is True:
+                g.setdefault("since", now)
+                if not g.get("sent") and now - g["since"] >= r["minutes"] * 60:
+                    mins = int((now - g["since"]) // 60)
+                    _notify(snap.id, {"title": f"{name} עדיין דלוק", "body": f"דלוק כבר {mins} דקות. הקש כדי לכבות.", "tag": "guard-" + r["id"], "url": "./#dev=" + did})
+                    g["sent"] = True
+            else:
+                g = {}
+        else:
+            raw = st.get("cur_power")
+            if not isinstance(raw, (int, float)):
+                continue
+            w = raw / (10 ** int(r.get("scale") or 0))
+            if w >= 8:
+                g.setdefault("run", now)
+                g["low"] = 0
+            elif g.get("run"):
+                g["low"] = int(g.get("low") or 0) + 1
+                if g["low"] >= 2 and now - g["run"] >= r["minutes"] * 60:
+                    _notify(snap.id, {"title": f"{name} סיים", "body": "הצריכה ירדה - נראה שהתוכנית נגמרה.", "tag": "guard-" + r["id"], "url": "./#dev=" + did})
+                    g = {}
+                elif g["low"] >= 6:
+                    g = {}
+        state[r["id"]] = g
+    snap.reference.update({"guard_state": state})
 
 
 FAULTS = ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"]
@@ -406,6 +462,17 @@ def _act(req):
     sess, ref = _sess_by_hash(tok.to_dict()["sess"])
     if not sess:
         raise ApiError("החיבור למזגן פג - התחבר מחדש באפליקציה", 401)
+    if req.args.get("m"):  # several devices in one link: [{"d": id, "c": [commands]}, ...]
+        raw = req.args["m"]
+        items = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode())
+        ok = 0
+        for it in items[:40]:
+            try:
+                _send(sess, ref, it["d"], it["c"])
+                ok += 1
+            except Exception:  # noqa: BLE001
+                pass
+        return req.args.get("s") or f"בוצע ({ok})"
     raw = req.args.get("c", "")
     cmds = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode())
     _send(sess, ref, req.args.get("d") or sess.get("device"), cmds)
@@ -744,6 +811,17 @@ def _route(req, path: str, body: dict):
         return {"mode": sess["mode"], "devices": _devices(sess, ref)}
     if path == "/homes":
         return _homes(sess, ref)
+    if path == "/guard":
+        return {"guard": sess.get("guard") or {"rules": []}}
+    if path == "/guard/save":
+        rules = []
+        for r in (body.get("rules") or [])[:30]:
+            if r.get("device") and r.get("kind") in ("on_long", "done"):
+                rules.append({"id": str(r.get("id") or secrets.token_hex(4)), "device": str(r["device"]), "kind": r["kind"],
+                              "minutes": max(1, min(24 * 60, int(r.get("minutes") or 20))), "name": str(r.get("name") or "")[:60],
+                              "pcode": str(r.get("pcode") or ""), "scale": int(r.get("scale") or 0), "enabled": bool(r.get("enabled", True))})
+        ref.update({"guard": {"rules": rules}, "guard_on": any(r["enabled"] for r in rules), "guard_state": {}})
+        return {"saved": True, "count": len(rules)}
     if path == "/device":
         did = body.get("id") or req.args.get("id", "")
         devs = _devices(sess, ref, did)
