@@ -405,6 +405,51 @@ def _num(st, code, scale):
     return v / (10 ** int(scale or 0))
 
 
+def _weather(loc):
+    """Outdoor temperature now and today's max/min at the home location (Open-Meteo, no key)."""
+    try:
+        r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=8, params={
+            "latitude": loc["lat"], "longitude": loc["lon"], "current": "temperature_2m",
+            "daily": "temperature_2m_max,temperature_2m_min", "timezone": "Asia/Jerusalem", "forecast_days": 1})
+        j = r.json()
+        return {"now": j["current"]["temperature_2m"], "max": j["daily"]["temperature_2m_max"][0], "min": j["daily"]["temperature_2m_min"][0]}
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _hebcal(sh, hs, now):
+    """Shabbat and holiday times for the next 3 weeks (Hebcal), refreshed once a day.
+    Returns (ins, outs): when each Shabbat/holiday block starts (first candle lighting) and ends (havdalah)."""
+    c = hs.get("hc") or {}
+    key = f"{now.strftime('%Y-%m-%d')}|{sh.get('lat')}|{sh.get('lon')}|{sh.get('candle')}"
+    if c.get("k") != key:
+        try:
+            r = requests.get("https://www.hebcal.com/hebcal", timeout=10, params={
+                "v": 1, "cfg": "json", "maj": "on", "c": "on", "i": "on", "M": "on", "geo": "pos",
+                "latitude": sh["lat"], "longitude": sh["lon"], "tzid": "Asia/Jerusalem", "b": int(sh.get("candle") or 30),
+                "start": (now - dt.timedelta(days=1)).strftime("%Y-%m-%d"), "end": (now + dt.timedelta(days=21)).strftime("%Y-%m-%d")})
+            ev = []
+            for it in r.json().get("items", []):
+                if it.get("category") in ("candles", "havdalah") and "T" in it.get("date", ""):
+                    ev.append([dt.datetime.fromisoformat(it["date"]).timestamp(), it["category"]])
+            ev.sort()
+            c = {"k": key, "ev": ev}
+            hs["hc"] = c
+        except Exception:  # noqa: BLE001
+            return [], []
+    ins, outs, prev = [], [], None
+    for t, cat in c.get("ev", []):
+        if cat == "candles" and prev != "candles":
+            ins.append(t)
+        elif cat == "havdalah":
+            outs.append(t)
+        prev = cat
+    return ins, outs
+
+
+WX_KINDS = ("out_above", "out_below", "fc_above", "fc_below")
+
+
 def _home(snap, sess, now):
     """HomeOn, every 2 minutes: energy use, offline alerts and if-then automations."""
     h = sess.get("home") or {}
@@ -416,12 +461,14 @@ def _home(snap, sess, now):
         ids += [d["id"] for d in off.get("devs", [])]
     for a in autos:
         ids += [a.get("if", {}).get("device"), a.get("then", {}).get("device")]
-    if not ids:
+    sh = h.get("shabbat") or {}
+    if not ids and not sh.get("on"):
         return
     data = _bulk(sess, snap.reference, ids)
     hs = dict(sess.get("home_state") or {})
     sid = snap.id
     t = time.time()
+    wx = _weather(h["loc"]) if h.get("loc") and any((a.get("if") or {}).get("kind") in WX_KINDS for a in autos) else None
     # energy: watt-hours per device per day
     if en.get("on"):
         add = {}
@@ -455,12 +502,25 @@ def _home(snap, sess, now):
     # if-then automations, fired when the condition becomes true
     for a in autos:
         c, th = a.get("if") or {}, a.get("then") or {}
-        info = data.get(c.get("device"))
+        kind, ok = c.get("kind"), None
+        if kind in WX_KINDS:
+            info = {"status": {}}
+        else:
+            info = data.get(c.get("device"))
         if not info:
             continue
         st = info["status"]
-        kind, ok = c.get("kind"), None
-        if kind in ("temp_above", "temp_below"):
+        if kind in WX_KINDS:
+            if wx:
+                v = float(c.get("value", 0))
+                if kind == "out_above":
+                    ok = wx["now"] > v
+                elif kind == "out_below":
+                    ok = wx["now"] < v
+                else:  # forecast, checked from a set time of day: false before it, so it fires once a day
+                    at = c.get("at") or "07:00"
+                    ok = now.strftime("%H:%M") >= at and (wx["max"] > v if kind == "fc_above" else wx["min"] < v)
+        elif kind in ("temp_above", "temp_below"):
             v = _num(st, c.get("code") or "temp_current", c.get("scale", 0))
             if v is not None:
                 ok = v > float(c.get("value", 0)) if kind == "temp_above" else v < float(c.get("value", 0))
@@ -487,12 +547,28 @@ def _home(snap, sess, now):
                 pass
         g["ok"] = ok
         hs[k] = g
+    # Shabbat and holidays: actions around candle lighting / havdalah, run by the server every week
+    if sh.get("on") and sh.get("lat") is not None:
+        ins, outs = _hebcal(sh, hs, now)
+        done = list(hs.get("shb") or [])
+        for i, a in enumerate(sh.get("acts") or []):
+            for base in (ins if a.get("when") == "in" else outs):
+                at = base + 60 * int(a.get("off") or 0)
+                tag = f"{i}@{int(at)}"
+                if 0 <= t - at < 20 * 60 and tag not in done:
+                    try:
+                        _send(sess, snap.reference, a["device"], [{"code": a.get("pcode") or "switch", "value": a.get("to") == "on"}])
+                    except Exception:  # noqa: BLE001
+                        pass
+                    done.append(tag)
+        hs["shb"] = done[-60:]
     snap.reference.update({"home_state": hs})
 
 
 def _home_on(h):
     h = h or {}
-    return bool((h.get("energy") or {}).get("on") or (h.get("offline") or {}).get("on") or any(a.get("enabled", True) for a in h.get("autos") or []))
+    return bool((h.get("energy") or {}).get("on") or (h.get("offline") or {}).get("on") or (h.get("shabbat") or {}).get("on")
+                or any(a.get("enabled", True) for a in h.get("autos") or []))
 
 
 def _clean_home(h):
@@ -502,14 +578,27 @@ def _clean_home(h):
     autos = []
     for a in (h.get("autos") or [])[:30]:
         c, th = a.get("if") or {}, a.get("then") or {}
-        if not c.get("device") or not th.get("device") or not isinstance(th.get("cmds"), list):
+        wxk = c.get("kind") in WX_KINDS
+        if (not c.get("device") and not wxk) or not th.get("device") or not isinstance(th.get("cmds"), list):
             continue
         autos.append({"id": str(a.get("id") or secrets.token_hex(4)), "name": str(a.get("name") or "")[:80], "text": str(a.get("text") or "")[:120],
                       "enabled": bool(a.get("enabled", True)), "notify": bool(a.get("notify")), "cool": max(1, min(1440, int(a.get("cool") or 10))),
-                      "if": {"device": str(c["device"]), "kind": str(c.get("kind") or ""), "code": str(c.get("code") or ""), "scale": int(c.get("scale") or 0), "value": float(c.get("value") or 0)},
+                      "if": {"device": str(c.get("device") or ""), "kind": str(c.get("kind") or ""), "code": str(c.get("code") or ""), "scale": int(c.get("scale") or 0),
+                             "value": float(c.get("value") or 0), "at": str(c.get("at") or "07:00")[:5]},
                       "then": {"device": str(th["device"]), "cmds": th["cmds"][:5]}})
-    return {"energy": {"on": bool(en.get("on")), "price": float(en.get("price") or 0.64), "devs": devs(en.get("devs"))},
-            "offline": {"on": bool(off.get("on")), "devs": devs(off.get("devs"))}, "autos": autos}
+    out = {"energy": {"on": bool(en.get("on")), "price": float(en.get("price") or 0.64), "devs": devs(en.get("devs"))},
+           "offline": {"on": bool(off.get("on")), "devs": devs(off.get("devs"))}, "autos": autos}
+    loc = h.get("loc") or {}
+    if loc.get("lat") is not None and loc.get("lon") is not None:
+        out["loc"] = {"lat": float(loc["lat"]), "lon": float(loc["lon"]), "name": str(loc.get("name") or "")[:40]}
+    sh = h.get("shabbat") or {}
+    if sh:
+        out["shabbat"] = {"on": bool(sh.get("on")), "lat": float(sh.get("lat") or 32.085), "lon": float(sh.get("lon") or 34.782),
+                          "candle": max(0, min(60, int(sh.get("candle") or 21))), "city": str(sh.get("city") or "")[:10],
+                          "acts": [{"device": str(a["device"]), "pcode": str(a.get("pcode") or "switch"), "to": "on" if a.get("to") == "on" else "off",
+                                    "when": "out" if a.get("when") == "out" else "in", "off": max(-600, min(600, int(a.get("off") or 0)))}
+                                   for a in (sh.get("acts") or [])[:30] if a.get("device")]}
+    return out
 
 
 FAULTS = ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "P8", "P9", "P10", "P11", "P12", "P13", "P14"]
@@ -979,6 +1068,17 @@ def _route(req, path: str, body: dict):
         hm_ = _clean_home(body.get("home") or {})
         ref.update({"home": hm_, "guard_on": _home_on(hm_) or any(r.get("enabled", True) for r in (sess.get("guard") or {}).get("rules", []))})
         return {"saved": True}
+    if path == "/states":  # light on/off + online for the widget and Siri
+        ids = [str(i) for i in (body.get("ids") or [])][:40]
+        out = {}
+        for did, info in _bulk(sess, ref, ids).items():
+            st = info.get("status") or {}
+            on = next((st[c] for c in POWER_CODES if isinstance(st.get(c), bool)), None)
+            out[did] = {"online": info.get("online", True), "on": on}
+        return {"states": out}
+    if path == "/weather":
+        loc = body.get("loc") or (sess.get("home") or {}).get("loc")
+        return {"weather": _weather(loc) if loc else None}
     if path == "/energy":
         days = max(1, min(62, int(body.get("days") or 31)))
         today_ = dt.datetime.now(TZ).date()
