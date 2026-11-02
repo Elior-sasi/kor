@@ -1575,7 +1575,10 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
   };
   window.__fitDial=fit;setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('.scrim'))fit()},1200);
   more.addEventListener('toggle',()=>setTimeout(fit,30));
-  document.addEventListener('touchmove',e=>{if(e.target.closest('.scrim'))return;
+  /* when the page fits, an up/down drag must not move it (iOS bounces frames even with nothing to scroll); sideways rows still scroll */
+  let tx=0,ty=0;document.addEventListener('touchstart',e=>{const t=e.touches[0];tx=t.clientX;ty=t.clientY},{passive:true});
+  document.addEventListener('touchmove',e=>{if(e.target.closest('.scrim,.knob-hit,#dial'))return;const t=e.touches[0];
+    if(Math.abs(t.clientX-tx)>Math.abs(t.clientY-ty))return;
     const app=document.getElementById('app');if(app.style.getPropertyValue('overflow-y')==='hidden')e.preventDefault()},{passive:false});
   addEventListener('load',fit);addEventListener('resize',()=>setTimeout(fit,50));setTimeout(fit,60);setTimeout(fit,600);
   window.__fitDial=fit;setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('.scrim'))fit()},1200);
