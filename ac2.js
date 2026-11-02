@@ -13,6 +13,9 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 #indoor{display:none!important}
 @container (max-width:250px){.room2 .tr{display:none}.room2{font-size:.95rem}.room2 .rv{font-size:1.15rem}}
 .ac-product{display:none!important}
+/* minus / plus sit inside the dial card, in its bottom corners beside the arc - saves a whole row */
+.ctl-row{position:relative;z-index:2;margin-top:-72px!important;margin-bottom:12px!important;padding:0 12px;pointer-events:none}
+.ctl-row .step{pointer-events:auto;background:#2c2c2e!important}
 .qt button{min-height:42px}
 html,body{overscroll-behavior:none}
 .ctl-row .air{display:none!important}
