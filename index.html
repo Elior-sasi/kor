@@ -1545,7 +1545,9 @@ function render(){
   tickTimer();
   document.querySelectorAll('#toggles [data-x]').forEach(b=>{const on=!!S['x_'+b.dataset.x];b.setAttribute('aria-pressed',on);const s=document.getElementById('sx_'+b.dataset.x);if(s)s.textContent=on?'פעיל':'כבוי'});
   renderConn();
+  (window.__acAfter||[]).forEach(f=>{try{f()}catch(e){}});
 }
+window.BZ={get S(){return S},get CAP(){return CAP},setTimer:(h,p)=>setTimer(h,p),timerLeftMin:()=>timerLeftMin(),buzz:()=>buzz(),toast:t=>toast(t),render:()=>render()};
 
 // demo simulation only
 setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.indoor+=S.indoor>S.temp?-1:1;saveDemo();render()}},20000);
@@ -1592,4 +1594,5 @@ if(linked){loadDevices();startPoll();idbGet('kor_key').then(v=>{if(v!==CFG.key)i
 else idbGet('kor_key').then(v=>{if(v&&v.length>=20&&!linked){CFG.key=v;LSset('kor_key',v);linked=true;connState='wait';renderConn();loadDevices();startPoll();toast('החיבור שוחזר')}});
 })();
 </script>
+<script src="ac2.js?v=1"></script>
 </body></html>
