@@ -619,7 +619,12 @@ addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];i
 .in-unplug .tog[aria-pressed="true"]::after{background-color:#3d8bff!important}
 .in-unplug .tog[aria-pressed="true"] svg{color:#6fa8ff!important;background:#3d8bff2e!important}
 .in-unplug .tog[aria-pressed="true"] .s{color:#6fa8ff!important}
-.in-unplug .chip[aria-pressed="true"],.in-unplug .pick button[aria-pressed="true"],.in-unplug .air[aria-pressed="true"],.in-unplug .turbo[aria-pressed="true"]{color:#6fa8ff!important;background:#3d8bff26!important}
+.in-unplug .air[aria-pressed="true"],.in-unplug .turbo[aria-pressed="true"]{color:#6fa8ff!important;background:#3d8bff26!important}
+/* a chosen option (day, mode, fan speed...) is solid orange with dark bold text - clear at a glance, not only by colour */
+.in-unplug .chip[aria-pressed="true"],.in-unplug .pick button[aria-pressed="true"]{background:#ff9a3d!important;color:#1a0c04!important;font-weight:700!important;border-color:transparent!important;box-shadow:none!important}
+.in-unplug .chip[aria-pressed="false"],.in-unplug .pick button[aria-pressed="false"]{background:#2c2c2e!important;color:#fff!important;font-weight:500!important}
+/* switches: blue when on, like everywhere in HomeOn */
+.in-unplug .sw[aria-pressed="true"]{background:#3d8bff!important}
 .in-unplug .air[aria-pressed="true"] svg{color:#6fa8ff!important}
 .in-unplug .prof[aria-pressed="true"] svg,.in-unplug .prof[aria-pressed="true"] b{color:#6fa8ff!important}
 .in-unplug .bb-t b{color:#6fa8ff!important}
@@ -1547,7 +1552,7 @@ function render(){
   renderConn();
   (window.__acAfter||[]).forEach(f=>{try{f()}catch(e){}});
 }
-window.BZ={get S(){return S},get CAP(){return CAP},setTimer:(h,p)=>setTimer(h,p),timerLeftMin:()=>timerLeftMin(),buzz:()=>buzz(),toast:t=>toast(t),render:()=>render()};
+window.BZ={openSchedEdit:r=>openSchedEdit(r),get S(){return S},get CAP(){return CAP},setTimer:(h,p)=>setTimer(h,p),timerLeftMin:()=>timerLeftMin(),buzz:()=>buzz(),toast:t=>toast(t),render:()=>render()};
 
 // demo simulation only
 setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.indoor+=S.indoor>S.temp?-1:1;saveDemo();render()}},20000);
