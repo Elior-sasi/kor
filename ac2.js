@@ -11,7 +11,10 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .room2 .tr{font-size:.85rem;font-weight:500;color:var(--muted)}
 .room2 svg{width:16px;height:16px;flex:none}
 #indoor{display:none!important}
+@container (max-width:250px){.room2 .tr{display:none}.room2{font-size:.95rem}.room2 .rv{font-size:1.15rem}}
 .ac-product{display:none!important}
+.qt button{min-height:42px}
+html,body{overscroll-behavior:none}
 .ctl-row .air{display:none!important}
 .qt{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .qt .ql{font-size:.9rem;color:var(--muted);margin-inline-end:2px}
@@ -62,4 +65,6 @@ const OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-widt
   qt.querySelectorAll('[data-qh]').forEach(b=>{const h=+b.dataset.qh;b.setAttribute('aria-pressed',!!h&&!!left&&Math.abs(left-h*60)<=3)});
 });
 B.render();
+/* the page re-fits now that the quick off-timer row is in */
+setTimeout(()=>window.__fitDial&&window.__fitDial(),50);
 })();
