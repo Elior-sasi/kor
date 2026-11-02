@@ -45,7 +45,7 @@ const OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-widt
   const S=B.S,CAP=B.CAP;
   const fanOnly=S.mode==='fan',col=S.power?(MODE_COL[S.mode]||'#ff9a3d'):null;
   const va=document.getElementById('valArc'),kn=document.getElementById('knob'),ml=document.getElementById('modeLbl');
-  if(va)va.style.stroke=col||'';if(kn)kn.style.stroke=col||'';if(ml)ml.style.color=col||'';
+  const imp=(e,k)=>{if(!e)return;col?e.style.setProperty(k,col,'important'):e.style.removeProperty(k)};imp(va,'stroke');imp(kn,'stroke');imp(ml,'color');
   if(S.indoor!=null&&(!CAP||CAP.indoor)){
     const d=S.indoor-S.temp;let ic='',tr='',say='';
     if(S.power&&!fanOnly&&S.mode!=='dry'){

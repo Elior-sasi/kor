@@ -1594,5 +1594,5 @@ if(linked){loadDevices();startPoll();idbGet('kor_key').then(v=>{if(v!==CFG.key)i
 else idbGet('kor_key').then(v=>{if(v&&v.length>=20&&!linked){CFG.key=v;LSset('kor_key',v);linked=true;connState='wait';renderConn();loadDevices();startPoll();toast('החיבור שוחזר')}});
 })();
 </script>
-<script src="ac2.js?v=1"></script>
+<script src="ac2.js?v=2"></script>
 </body></html>
