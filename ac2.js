@@ -11,6 +11,7 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .room2 .tr{font-size:.85rem;font-weight:500;color:var(--muted)}
 .room2 svg{width:16px;height:16px;flex:none}
 #indoor{display:none!important}
+.ac-product{display:none!important}
 .ctl-row .air{display:none!important}
 .qt{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .qt .ql{font-size:.9rem;color:var(--muted);margin-inline-end:2px}
