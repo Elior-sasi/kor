@@ -610,6 +610,11 @@ b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};h.insertBe
 let x0=null,y0=0;addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.clientX>innerWidth-28||t.clientX<28?t.clientX:null;y0=t.clientY},{passive:true});
 addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];if(Math.abs(t.clientX-x0)>90&&Math.abs(t.clientY-y0)<60)b.onclick();x0=null},{passive:true})})})();</script>
 <style>
+/* Match HomeOn's dark surface and orange controls only when embedded. */
+.in-unplug{--bg:#0a0f14;--surface:#121a22;--surface-2:#18222c;--line:#223040;--fg:#f2f4f8;--muted:#b4bdca;--accent:#ffb23e;--accent-soft:rgba(255,178,62,.15);--ok:#3fd49a;--f-body:Rubik,system-ui,sans-serif}
+.in-unplug body{font-size:17px}
+.in-unplug button:focus-visible{outline:3px solid #ffd28a;outline-offset:3px}
+.in-unplug #unplugBack{background:#18222c!important;border:1px solid #223040!important}
 .in-unplug #conn,.in-unplug [data-go="siri"],.in-unplug [data-go="conn"],.in-unplug #pushRow,.in-unplug .menu-list+p{display:none!important}
 .in-unplug header.top{gap:10px}.in-unplug header.top>div:nth-child(2){flex:1;min-width:0}
 .in-unplug #unplugBack{flex:none!important;width:44px!important;height:44px!important;border-radius:50%!important;background:#2c2c2e!important;color:#fff!important;display:grid!important;place-items:center}
