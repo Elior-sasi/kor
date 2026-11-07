@@ -1573,9 +1573,10 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
     app.style.setProperty('gap','12px','important');
     app.style.setProperty('padding-bottom',Math.ceil(innerHeight-bar.getBoundingClientRect().top+16)+'px','important');
     /* the biggest dial that still keeps the whole page on one screen; scroll only when "more settings" is open */
-    let w=Math.max(170,Math.min(dial.parentElement.clientWidth-96,300));
-    dial.style.setProperty('width',w+'px','important');
-    if(!more.open)while(w>200&&app.scrollHeight>app.clientHeight+1){w-=10;dial.style.setProperty('width',w+'px','important')}
+    /* with "more settings" open the page scrolls anyway: keep the dial as it is, so it doesn't jump */
+    if(!more.open){let w=Math.max(170,Math.min(dial.parentElement.clientWidth-96,300));
+      dial.style.setProperty('width',w+'px','important');
+      while(w>200&&app.scrollHeight>app.clientHeight+1){w-=10;dial.style.setProperty('width',w+'px','important')}}
     app.style.setProperty('overflow-y',app.scrollHeight>app.clientHeight+1?'auto':'hidden','important');
   };
   window.__fitDial=fit;setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('.scrim'))fit()},1200);

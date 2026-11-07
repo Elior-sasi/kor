@@ -262,23 +262,38 @@ def _tick():
     for snap in _db().collection("kor_schedules").where("enabled", "==", True).stream():
         sc = snap.to_dict()
         due = False
+        t = str(sc.get("time") or "")
         if sc.get("once_at"):
             due = sc["once_at"] <= time.time()
-        elif sc.get("time") == hm and wd in sc.get("days", []) and sc.get("last") != today + " " + hm:
-            due = True
+        elif wd in sc.get("days", []) and t and t <= hm and sc.get("last") != today + " " + t:
+            # catch up if a tick was late or skipped (up to 5 minutes), instead of losing the day's run
+            try:
+                at = now.replace(hour=int(t[:2]), minute=int(t[3:5]), second=0, microsecond=0)
+                late = (now - at).total_seconds()
+            except ValueError:
+                at, late = now, 999
+            # a schedule saved after its time today (e.g. 07:00 saved at 07:02) starts tomorrow, not now
+            due = 0 <= late < 5 * 60 and float(sc.get("saved") or 0) < at.timestamp()
         if not due:
             continue
+        ok = False
         try:
             sess, ref = _sess_by_hash(sc["sess"])
             if sess:
                 _send(sess, ref, sc["device"], sc["cmds"])
                 ran += 1
+                ok = True
         except Exception:  # noqa: BLE001
             errs += 1
         if sc.get("once_at") or sc.get("once"):
-            snap.reference.delete()
+            # a one-time timer that failed (device or cloud hiccup) gets two more tries a minute apart
+            tries = int(sc.get("tries") or 0) + 1
+            if ok or tries >= 3:
+                snap.reference.delete()
+            else:
+                snap.reference.update({"tries": tries})
         else:
-            snap.reference.update({"last": today + " " + hm})
+            snap.reference.update({"last": today + " " + (t or hm)})
     if now.minute % 2 == 0:
         for snap in _db().collection("kor_sessions").where("track", "==", True).stream():
             sess = snap.to_dict()
@@ -958,7 +973,7 @@ def _route(req, path: str, body: dict):
         _db().collection("kor_schedules").document(sid).set({
             "sess": ref.id, "device": body.get("device"), "time": body.get("time"), "days": body.get("days") or [],
             "cmds": body.get("cmds") or [], "label": body.get("label", ""), "enabled": bool(body.get("enabled", True)),
-            "once": bool(body.get("once"))})
+            "once": bool(body.get("once")), "saved": time.time()})
         return {"id": sid}
     if path == "/schedules/delete":
         sid = body.get("id", "")
