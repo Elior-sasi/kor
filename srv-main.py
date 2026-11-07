@@ -870,6 +870,129 @@ def _push_route(path, body, ref):
     return None
 
 
+# ---------------- MOVA E30 Ultra (MOVAhome cloud, like the MOVAhome app) ----------------
+# The cloud protocol is vendored from Tasshack/dreame-vacuum (MIT) as mova.py next to this file.
+# The password is used once to log in and is never stored; only the account e-mail, region,
+# the vacuum id and the refresh token are kept in the session.
+_MOVA_MOD = None
+MOVA_REGIONS = ("eu", "us", "sg", "ru", "cn")
+MV_PROPS = {"state": (2, 1), "error": (2, 2), "battery": (3, 1), "charging": (3, 2), "status": (4, 1),
+            "time": (4, 2), "area": (4, 3), "suction": (4, 4), "water": (4, 5), "mode": (4, 23)}
+MV_ACTS = {"start": (2, 1), "pause": (2, 2), "dock": (3, 1), "stop": (4, 2), "locate": (7, 1)}
+MV_SET = {"suction": ((4, 4), (0, 1, 2, 3)), "water": ((4, 5), (1, 2, 3)), "mode": ((4, 23), (0, 1, 2))}
+
+
+def _mova_mod():
+    global _MOVA_MOD
+    if _MOVA_MOD is None:
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mova.py")
+        if not os.path.exists(path):
+            raise ApiError("השרת צריך עדכון כדי לחבר את השואב")
+        spec = importlib.util.spec_from_file_location("mova_proto", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _MOVA_MOD = mod
+    return _MOVA_MOD
+
+
+def _mova_client(mv, password=""):
+    c = _mova_mod().DreameVacuumDreameHomeCloudProtocol(
+        mv.get("user", ""), password, "mova", mv.get("country") or "eu", None if password else mv.get("auth"), mv.get("did"))
+    if not c.login():
+        raise ApiError("החיבור ל-MOVAhome פג. צריך להתחבר מחדש" if not password else "האימייל או הסיסמה של MOVAhome לא נכונים", 409)
+    if mv.get("did"):
+        c._did = str(mv["did"])
+        if mv.get("host"):
+            c._host = mv["host"]
+        else:
+            try:
+                c.get_device_info()
+            except Exception:  # noqa: BLE001
+                pass
+    return c
+
+
+def _mova_save(ref, mv, c):
+    mv = dict(mv)
+    if getattr(c, "_secondary_key", None):
+        mv["auth"] = c._secondary_key        # the refresh token can change on every login
+    if getattr(c, "_host", None):
+        mv["host"] = c._host
+    ref.update({"mova": mv})
+    return mv
+
+
+def _mova_route(path, body, sess, ref):
+    mv = sess.get("mova") or {}
+    if path == "/mova/login":
+        user, pw = str(body.get("email") or "").strip(), str(body.get("password") or "")
+        if not user or not pw:
+            raise ApiError("צריך אימייל וסיסמה של MOVAhome")
+        regions = [body["country"]] if body.get("country") in MOVA_REGIONS else list(MOVA_REGIONS)
+        last = None
+        for country in regions:
+            try:
+                c = _mova_client({"user": user, "country": country}, pw)
+            except ApiError as e:
+                last = e
+                continue
+            data = c.get_devices() or {}
+            recs = ((data.get("page") or {}).get("records")) or []
+            vac = [r for r in recs if ".vacuum." in str(r.get("model", ""))]
+            if not vac:
+                last = ApiError("החשבון מחובר, אבל לא נמצא בו שואב")
+                continue
+            r = vac[0]
+            c._did = str(r["did"])
+            try:
+                c.get_device_info()
+            except Exception:  # noqa: BLE001
+                pass
+            name = r.get("customName") or (r.get("deviceInfo") or {}).get("displayName") or "MOVA"
+            mv = _mova_save(ref, {"user": user, "country": country, "did": str(r["did"]), "model": r.get("model", ""), "name": name}, c)
+            return {"mova": {"name": name, "model": mv["model"]}}
+        raise last or ApiError("לא הצלחתי להתחבר ל-MOVAhome")
+    if path == "/mova/logout":
+        ref.update({"mova": firestore.DELETE_FIELD})
+        return {"done": True}
+    if not mv.get("did"):
+        raise ApiError("השואב לא מחובר", 404)
+    c = _mova_client(mv)
+    did = str(mv["did"])
+    if path == "/mova/state":
+        res = c.send("get_properties", [{"did": did, "siid": s, "piid": p} for s, p in MV_PROPS.values()]) or []
+        out = {}
+        for k, (s, p) in MV_PROPS.items():
+            for x in res if isinstance(res, list) else []:
+                if x.get("siid") == s and x.get("piid") == p and x.get("code", 0) == 0:
+                    out[k] = x.get("value")
+        _mova_save(ref, mv, c)
+        if not out:
+            raise ApiError("השואב לא ענה. בדוק שהוא מחובר ל-WiFi")
+        return {"state": out, "name": mv.get("name", "MOVA")}
+    if path == "/mova/act":
+        a = MV_ACTS.get(str(body.get("a")))
+        if not a:
+            raise ApiError("פעולה לא מוכרת")
+        r = c.send("action", {"did": did, "siid": a[0], "aiid": a[1], "in": []})
+        _mova_save(ref, mv, c)
+        if r is None:
+            raise ApiError("השואב לא קיבל את הפקודה")
+        return {"sent": True}
+    if path == "/mova/set":
+        k = str(body.get("k"))
+        if k not in MV_SET or body.get("v") not in MV_SET[k][1]:
+            raise ApiError("הגדרה לא מוכרת")
+        (s, p), _ = MV_SET[k]
+        r = c.send("set_properties", [{"did": did, "siid": s, "piid": p, "value": body["v"]}])
+        _mova_save(ref, mv, c)
+        if r is None:
+            raise ApiError("השואב לא קיבל את ההגדרה")
+        return {"sent": True}
+    raise ApiError("לא נמצא", 404)
+
+
 def _route(req, path: str, body: dict):
     if path == "/share/qr":
         code = (body.get("userCode") or "").strip()
@@ -1083,6 +1206,8 @@ def _route(req, path: str, body: dict):
         hm_ = _clean_home(body.get("home") or {})
         ref.update({"home": hm_, "guard_on": _home_on(hm_) or any(r.get("enabled", True) for r in (sess.get("guard") or {}).get("rules", []))})
         return {"saved": True}
+    if path.startswith("/mova/"):
+        return _mova_route(path, body, sess, ref)
     if path == "/states":  # light on/off + online for the widget and Siri
         ids = [str(i) for i in (body.get("ids") or [])][:40]
         out = {}

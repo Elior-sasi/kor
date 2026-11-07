@@ -6,6 +6,7 @@ mkdir -p ~/k && cd ~/k
 echo "▶ מוריד קוד..."
 curl -fsSL "$B/srv-main.py?$(date +%s)" -o main.py
 curl -fsSL "$B/srv-req.txt?$(date +%s)" -o requirements.txt
+curl -fsSL "$B/srv-mova.py?$(date +%s)" -o mova.py
 printf 'venv/\n*.sh\n.tick\n.vapid\n' > .gcloudignore
 [ -s .tick ] || (head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32 > .tick)
 T=$(cat .tick)
