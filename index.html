@@ -611,16 +611,8 @@ let x0=null,y0=0;addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.cli
 addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];if(Math.abs(t.clientX-x0)>90&&Math.abs(t.clientY-y0)<60)b.onclick();x0=null},{passive:true})})})();</script>
 <style>
 /* Match HomeOn's dark surface and orange controls only when embedded. */
-.in-unplug{--bg:#0a0f14;--surface:#121a22;--surface-2:#18222c;--line:#223040;--fg:#f2f4f8;--muted:#b4bdca;--accent:#4f97ff;--accent-soft:rgba(79,151,255,.15);--ok:#3fd49a;--f-body:Rubik,system-ui,sans-serif}
+.in-unplug{--bg:#0a0f14;--surface:#121a22;--surface-2:#18222c;--line:#223040;--fg:#f2f4f8;--muted:#b4bdca;--accent:#ffb23e;--accent-soft:rgba(255,178,62,.15);--ok:#3fd49a;--f-body:Rubik,system-ui,sans-serif}
 .in-unplug body{font-size:17px}
-/* HomeOn accent is blue: everything that was orange in the stand-alone AC page (heat mode on the dial stays orange) */
-.in-unplug .air[aria-pressed=true]{background:#3d8bff24!important;color:#9cc2ff!important}
-.in-unplug .power,.in-unplug .app.is-off .power{background:#3d8bff!important;color:#031026!important}
-.in-unplug .prof[aria-pressed=true]{background:linear-gradient(160deg,#132a4a,#1c1c1e 80%)!important;box-shadow:inset 0 0 0 1.5px #3d8bff66!important}
-.in-unplug #toggles .tog[aria-pressed=true]::after{background-color:#3d8bff}
-.in-unplug #toggles .tog[aria-pressed=true] svg{background:#3d8bff24!important;color:#9cc2ff!important}
-.in-unplug .bb-dots i.on{background:#3d8bff!important}
-.in-unplug .sheet .pick button[aria-pressed=true],.in-unplug .sheet .chip[aria-pressed=true],.in-unplug .sheet .btn.pri{background:#3d8bff!important;color:#031026!important}
 .in-unplug button:focus-visible{outline:3px solid #ffd28a;outline-offset:3px}
 .in-unplug #unplugBack{background:#18222c!important;border:1px solid #223040!important}
 .in-unplug #conn,.in-unplug [data-go="siri"],.in-unplug [data-go="conn"],.in-unplug #pushRow,.in-unplug .menu-list+p{display:none!important}
@@ -634,7 +626,7 @@ addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];i
 .in-unplug .tog[aria-pressed="true"] .s{color:#6fa8ff!important}
 .in-unplug .air[aria-pressed="true"],.in-unplug .turbo[aria-pressed="true"]{color:#6fa8ff!important;background:#3d8bff26!important}
 /* a chosen option (day, mode, fan speed...) is solid orange with dark bold text - clear at a glance, not only by colour */
-.in-unplug .chip[aria-pressed="true"],.in-unplug .pick button[aria-pressed="true"]{background:#3d8bff!important;color:#031026!important;font-weight:700!important;border-color:transparent!important;box-shadow:none!important}
+.in-unplug .chip[aria-pressed="true"],.in-unplug .pick button[aria-pressed="true"]{background:#ff9a3d!important;color:#1a0c04!important;font-weight:700!important;border-color:transparent!important;box-shadow:none!important}
 .in-unplug .chip[aria-pressed="false"],.in-unplug .pick button[aria-pressed="false"]{background:#2c2c2e!important;color:#fff!important;font-weight:500!important}
 /* switches: blue when on, like everywhere in HomeOn */
 .in-unplug .sw[aria-pressed="true"]{background:#3d8bff!important}
@@ -1532,8 +1524,8 @@ function renderConn(){
 }
 function render(){
   const m=MODES.find(x=>x.id===S.mode)||MODES[0];
-  const root=document.documentElement;root.style.setProperty('--accent',window.IN_HOMEON?'#4f97ff':'#ff9a3d');
-  root.style.setProperty('--accent-soft',window.IN_HOMEON?'rgba(79,151,255,.15)':'rgba(255,154,61,.15)');
+  const root=document.documentElement;root.style.setProperty('--accent','#ff9a3d');
+  root.style.setProperty('--accent-soft','rgba(255,154,61,.15)');
   $('app').classList.toggle('is-off',!S.power);
   const fanOnly=S.mode==='fan';
   $('tempNum').textContent=fanOnly?'--':(Number.isInteger(S.temp)?S.temp:S.temp.toFixed(1));
@@ -1620,5 +1612,5 @@ if(linked){loadDevices();startPoll();idbGet('kor_key').then(v=>{if(v!==CFG.key)i
 else idbGet('kor_key').then(v=>{if(v&&v.length>=20&&!linked){CFG.key=v;LSset('kor_key',v);linked=true;connState='wait';renderConn();loadDevices();startPoll();toast('החיבור שוחזר')}});
 })();
 </script>
-<script src="ac2.js?v=7"></script>
+<script src="ac2.js?v=6"></script>
 </body></html>

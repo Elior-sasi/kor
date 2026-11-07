@@ -4,7 +4,7 @@
 (function(){
 if(!window.BZ)return;
 const B=window.BZ;
-const MODE_COL={heat:'#ff9a3d',cool:'#5ac8fa',auto:'#3d8bff',dry:'#64d2c8',fan:'#aeb4bf'};
+const MODE_COL={heat:'#ff9a3d',cool:'#5ac8fa',auto:'#ff9a3d',dry:'#64d2c8',fan:'#aeb4bf'};
 document.head.insertAdjacentHTML('beforeend',`<style>
 .room2{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;font-size:1.05rem;font-weight:600;color:var(--fg)}
 .room2 .rv{font-size:1.35rem;font-weight:700}
@@ -50,7 +50,7 @@ const OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-widt
 
 (window.__acAfter=window.__acAfter||[]).push(function(){
   const S=B.S,CAP=B.CAP;
-  const fanOnly=S.mode==='fan',col=S.power?(MODE_COL[S.mode]||'#3d8bff'):null;
+  const fanOnly=S.mode==='fan',col=S.power?(MODE_COL[S.mode]||'#ff9a3d'):null;
   const va=document.getElementById('valArc'),kn=document.getElementById('knob'),ml=document.getElementById('modeLbl');
   const imp=(e,k)=>{if(!e)return;col?e.style.setProperty(k,col,'important'):e.style.removeProperty(k)};imp(va,'stroke');imp(kn,'stroke');imp(ml,'color');
   if(S.indoor!=null&&(!CAP||CAP.indoor)){
