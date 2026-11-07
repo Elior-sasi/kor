@@ -968,6 +968,11 @@ def _mova_route(path, body, sess, ref):
             V.act(d, str(body.get("a") or ""), body)
             V._quiet(d)
             return {"sent": True, **V.snapshot(d)}
+        if path == "/mova/edit":
+            V.edit(ref.id, d, body)
+            V._quiet(d)
+            m = V.render_map(ref.id, d)
+            return {"sent": True, "map": m, **V.snapshot(d)}
         if path == "/mova/set":
             V.set_value(d, str(body.get("k") or ""), body.get("v"))
             V._quiet(d)

@@ -21,6 +21,23 @@ from dreame.types import (
 )
 
 
+# On a server a background thread may never get CPU after the response is sent, so the library's
+# "async" cloud calls (settings, map edits) run inline instead.
+from dreame.protocol import DreameVacuumDreameHomeCloudProtocol as _Cloud
+
+
+def _send_now(self, callback, method, parameters=None, retry_count=2):
+    try:
+        r = self.send(method, parameters, retry_count)
+    except Exception:  # noqa: BLE001
+        r = None
+    if callback:
+        callback(r)
+
+
+_Cloud.send_async = _send_now
+
+
 class VacError(Exception):
     def __init__(self, msg, status=400):
         super().__init__(msg)
@@ -414,7 +431,7 @@ def render_map(key, d):
         r = DreameVacuumMapRenderer(
             "Dreame Dark", 0,
             ["name", "name_background", "order", "suction_level", "water_volume", "cleaning_times",
-             "cleaning_mode", "mopping_mode"],
+             "cleaning_mode", "mopping_mode", "no_go", "no_mop", "virtual_wall"],
             _g(d.capability, "robot_type", 0), False, False, segment_names=SEGMENT_HE)
         _RENDERERS[key] = r
     png = r.render_map(d.get_map_for_render(md), d.status.robot_status, d.status.station_status)
@@ -438,7 +455,97 @@ def render_map(key, d):
                 continue
             X, Y = px(rm["x"], rm["y"])
             rooms.append({"id": rm["id"], "name": rm["name"], "px": round(X / w * 100, 2), "py": round(Y / h * 100, 2)})
-    return {"png": base64.b64encode(png).decode(), "w": w, "h": h, "rooms": rooms}
+    zones = {"walls": [], "nogo": [], "nomop": []}
+    maps = []
+    if cal and w and h:
+        _CAL[key] = {"cal": cal, "w": w, "h": h}
+
+        def pc(x, y):
+            X, Y = px(x, y)
+            return [round(X / w * 100, 2), round(Y / h * 100, 2)]
+        for wl in (getattr(md, "walls", None) or []):
+            zones["walls"].append(pc(wl.x0, wl.y0) + pc(wl.x1, wl.y1))
+        for k, attr in (("nogo", "no_go_areas"), ("nomop", "no_mopping_areas")):
+            for a in (getattr(md, attr, None) or []):
+                zones[k].append(pc(a.x0, a.y0) + pc(a.x2, a.y2))
+    try:
+        sel = d.status.selected_map
+        for mid, m in (d.status.map_data_list or {}).items():
+            maps.append({"id": int(mid), "name": getattr(m, "custom_name", None) or f"מפה {mid}",
+                         "current": bool(sel and sel.map_id == mid)})
+    except Exception:  # noqa: BLE001
+        pass
+    return {"png": base64.b64encode(png).decode(), "w": w, "h": h, "rooms": rooms, "zones": zones, "maps": maps,
+            "map_id": getattr(md, "map_id", None)}
+
+
+_CAL = {}
+
+
+def _to_map(key, xp, yp):
+    """A point on the picture (percent) back to vacuum map coordinates."""
+    c = _CAL.get(key)
+    if not c:
+        raise VacError("צריך לטעון את המפה קודם")
+    cal, w, h = c["cal"], c["w"], c["h"]
+    p0, p1, p2 = [(q["map"]["x"], q["map"]["y"]) for q in cal[:3]]
+    X, Y = float(xp) / 100 * w, float(yp) / 100 * h
+    ax, ay = (p1[0] - p0[0]) / 1000, (p1[1] - p0[1]) / 1000
+    bx, by = (p2[0] - p0[0]) / 1000, (p2[1] - p0[1]) / 1000
+    det = ax * by - bx * ay
+    if not det:
+        raise VacError("המפה לא מוכנה")
+    dx, dy = X - p0[0], Y - p0[1]
+    return [int(round((dx * by - bx * dy) / det)), int(round((ax * dy - dx * ay) / det))]
+
+
+def _seg4(key, q):
+    if not isinstance(q, (list, tuple)) or len(q) != 4:
+        raise VacError("קואורדינטות לא תקינות")
+    return _to_map(key, q[0], q[1]) + _to_map(key, q[2], q[3])
+
+
+def edit(key, d, body):
+    op = str(body.get("op") or "")
+    segs = _g(d.status, "segments") or {}
+    if op == "rename":
+        sid = int(body.get("id"))
+        name = str(body.get("name") or "").strip()[:24]
+        if sid not in segs:
+            raise VacError("החדר לא נמצא")
+        t = body.get("type")
+        t = int(t) if t not in (None, "") else int(_g(segs[sid], "type", 0) or 0)
+        if not name and t == 0:
+            raise VacError("צריך שם לחדר")
+        return d.set_segment_name(sid, t, name or None)
+    if op == "merge":
+        ids = [int(x) for x in body.get("ids") or []]
+        if len(ids) != 2:
+            raise VacError("בוחרים שני חדרים צמודים")
+        return d.merge_segments(None, ids)
+    if op == "split":
+        sid = int(body.get("id"))
+        return d.split_segments(None, sid, _seg4(key, body.get("line")))
+    if op == "zones":
+        z = body.get("zones") or {}
+        walls = [_seg4(key, q) for q in z.get("walls") or []]
+        nogo = [_seg4(key, q) for q in z.get("nogo") or []]
+        nomop = [_seg4(key, q) for q in z.get("nomop") or []]
+        return d.set_restricted_zone(walls, nogo, nomop)
+    if op == "order":
+        return d.set_cleaning_sequence([int(x) for x in body.get("ids") or []])
+    if op == "room_set":
+        sid, k, v = int(body.get("id")), str(body.get("k")), int(body.get("v"))
+        fn = {"suction": d.set_segment_suction_level, "water": d.set_segment_water_volume,
+              "times": d.set_segment_cleaning_times, "mode": d.set_segment_cleaning_mode}.get(k)
+        if not fn:
+            raise VacError("הגדרה לא מוכרת")
+        return fn(sid, v)
+    if op == "select_map":
+        return d.set_selected_map(int(body.get("id")))
+    if op == "rename_map":
+        return d.rename_map(int(body.get("id")), str(body.get("name") or "")[:24])
+    raise VacError("פעולה לא מוכרת")
 
 
 # ---------- commands ----------
