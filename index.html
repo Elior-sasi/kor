@@ -883,7 +883,7 @@ const hrs=m=>{m=Math.round(m||0);const h=Math.floor(m/60);return h?`${h}:${Strin
 let pollT;
 async function refresh(){
   if(!linked||!DEV||sending||dragging)return;
-  try{const j=await api('/device',{id:DEV.id});if(j.device){DEV.online=j.device.online;DEV.status=Object.assign(DEV.status||{},j.device.status||{});readStatus(j.device.status||{});connState=DEV.online?'on':'offline';cacheDev();
+  try{const j=await api('/device',{id:DEV.id});if(j.device){DEV.online=j.device.online;DEV.status=Object.assign(DEV.status||{},j.device.status||{});readStatus(j.device.status||{});if(LASTCMD&&Date.now()-LASTCMD.at<8000)Object.assign(S,LASTCMD.patch);connState=DEV.online?'on':'offline';cacheDev();
     if(PENDING&&Date.now()>PENDING){PENDING=0;$('app').classList.remove('pending')}render()}}
   catch(e){connState='err';lastErr=netMsg(e);renderConn()}
 }
@@ -891,6 +891,8 @@ function startPoll(){clearInterval(pollT);pollT=setInterval(()=>{if(document.vis
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh()});
 
 let PENDING=0,sending=0,queue={},qT;
+/* the cloud reports a new state a few seconds late: right after a command, what was sent wins over a stale report */
+let LASTCMD=null;
 function send(patch,immediate){
   if('power' in patch&&S.timerAt&&S.timerAt>Date.now()&&patch.power===S.timerPower){setTimeout(()=>setTimer(0),0)}
   if('fan' in patch&&CAP&&CAP.fan){const r=fanRawFor(String(patch.fan).toLowerCase());if(r!==undefined)patch.fan=r}
@@ -901,7 +903,7 @@ function send(patch,immediate){
   function flush(){const p=queue;queue={};const cmds=toCommands(p);if(!cmds.length)return;
     sending++;$('app').classList.add('busy');
     PENDING=1;$('app').classList.add('pending');
-    api('/command',{id:DEV.id,commands:cmds}).then(()=>{PENDING=Date.now()+1500;setTimeout(refresh,1800)})
+    api('/command',{id:DEV.id,commands:cmds}).then(()=>{PENDING=Date.now()+1500;LASTCMD={at:Date.now(),patch:{...(LASTCMD&&Date.now()-LASTCMD.at<8000?LASTCMD.patch:{}),...p}};setTimeout(refresh,1800);setTimeout(refresh,9000)})
       .catch(e=>{PENDING=0;$('app').classList.remove('pending');Object.assign(S,prev);render();toast(netMsg(e))})
       .finally(()=>{sending--;if(!sending)$('app').classList.remove('busy')});
   }
