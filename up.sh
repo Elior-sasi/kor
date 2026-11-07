@@ -6,7 +6,10 @@ mkdir -p ~/k && cd ~/k
 echo "▶ מוריד קוד..."
 curl -fsSL "$B/srv-main.py?$(date +%s)" -o main.py
 curl -fsSL "$B/srv-req.txt?$(date +%s)" -o requirements.txt
-curl -fsSL "$B/srv-mova.py?$(date +%s)" -o mova.py
+curl -fsSL "$B/srv-vac.py?$(date +%s)" -o vac.py
+rm -f mova.py; mkdir -p dreame
+for f in __init__ const device exceptions map protocol types resources; do curl -fsSL "$B/dreame/$f.py?$(date +%s)" -o "dreame/$f.py"; done
+curl -fsSL "$B/dreame/LICENSE" -o dreame/LICENSE
 printf 'venv/\n*.sh\n.tick\n.vapid\n' > .gcloudignore
 [ -s .tick ] || (head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32 > .tick)
 T=$(cat .tick)
@@ -19,7 +22,7 @@ echo "▶ מפעיל תזמון בגוגל..."
 gcloud services enable cloudscheduler.googleapis.com --quiet
 echo "▶ מעלה את השרת (2-4 דקות)..."
 gcloud functions deploy kor --gen2 --runtime=python312 --region=$R --source=. --entry-point=kor \
-  --trigger-http --allow-unauthenticated --memory=256Mi --timeout=120 --set-env-vars=TICK_SECRET=$T,VAPID_PEM=$V --quiet >/dev/null
+  --trigger-http --allow-unauthenticated --memory=1Gi --timeout=120 --set-env-vars=TICK_SECRET=$T,VAPID_PEM=$V --quiet >/dev/null
 URL=$(gcloud functions describe kor --region=$R --format='value(url)')
 echo "▶ קובע ריצה כל דקה..."
 if gcloud scheduler jobs describe kor-tick --location=$R >/dev/null 2>&1; then

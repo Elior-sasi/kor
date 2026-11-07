@@ -3,8 +3,11 @@ firebase-admin>=6.5,<8
 tuya-device-sharing-sdk>=0.2.1,<0.3
 requests>=2.31
 cryptography>=42
-# MOVA vacuum (MOVAhome cloud)
+# MOVA vacuum (MOVAhome cloud, vendored dreame-vacuum library)
+numpy>=1.26
+Pillow>=10
+mini-racer>=0.12
 pycryptodome>=3.19
-paho-mqtt>=1.6
+paho-mqtt>=2.0
 pyOpenSSL>=23
 certifi

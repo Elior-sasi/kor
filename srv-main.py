@@ -874,53 +874,47 @@ def _push_route(path, body, ref):
 # The cloud protocol is vendored from Tasshack/dreame-vacuum (MIT) as mova.py next to this file.
 # The password is used once to log in and is never stored; only the account e-mail, region,
 # the vacuum id and the refresh token are kept in the session.
-_MOVA_MOD = None
+_VAC = None
 MOVA_REGIONS = ("eu", "us", "sg", "ru", "cn")
-MV_PROPS = {"state": (2, 1), "error": (2, 2), "battery": (3, 1), "charging": (3, 2), "status": (4, 1),
-            "time": (4, 2), "area": (4, 3), "suction": (4, 4), "water": (4, 5), "mode": (4, 23)}
-MV_ACTS = {"start": (2, 1), "pause": (2, 2), "dock": (3, 1), "stop": (4, 2), "locate": (7, 1)}
-MV_SET = {"suction": ((4, 4), (0, 1, 2, 3)), "water": ((4, 5), (1, 2, 3)), "mode": ((4, 23), (0, 1, 2))}
 
 
-def _mova_mod():
-    global _MOVA_MOD
-    if _MOVA_MOD is None:
+def _vac():
+    """The vacuum module and the vendored dreame-vacuum library load only when the vacuum is used."""
+    global _VAC
+    if _VAC is None:
         import importlib.util
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mova.py")
-        if not os.path.exists(path):
+        import sys
+        here = os.path.dirname(os.path.abspath(__file__))
+        if not os.path.exists(os.path.join(here, "vac.py")) or not os.path.isdir(os.path.join(here, "dreame")):
             raise ApiError("השרת צריך עדכון כדי לחבר את השואב")
-        spec = importlib.util.spec_from_file_location("mova_proto", path)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        spec = importlib.util.spec_from_file_location("homeon_vac", os.path.join(here, "vac.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        _MOVA_MOD = mod
-    return _MOVA_MOD
+        _VAC = mod
+    return _VAC
 
 
-def _mova_client(mv, password=""):
-    c = _mova_mod().DreameVacuumDreameHomeCloudProtocol(
-        mv.get("user", ""), password, "mova", mv.get("country") or "eu", None if password else mv.get("auth"), mv.get("did"))
+def _mova_login(user, pw, country):
+    _vac()
+    from dreame.protocol import DreameVacuumDreameHomeCloudProtocol
+    c = DreameVacuumDreameHomeCloudProtocol(user, pw, "mova", country, None, None)
     if not c.login():
-        raise ApiError("החיבור ל-MOVAhome פג. צריך להתחבר מחדש" if not password else "האימייל או הסיסמה של MOVAhome לא נכונים", 409)
-    if mv.get("did"):
-        c._did = str(mv["did"])
-        if mv.get("host"):
-            c._host = mv["host"]
-        else:
-            try:
-                c.get_device_info()
-            except Exception:  # noqa: BLE001
-                pass
+        return None
     return c
 
 
-def _mova_save(ref, mv, c):
-    mv = dict(mv)
-    if getattr(c, "_secondary_key", None):
-        mv["auth"] = c._secondary_key        # the refresh token can change on every login
-    if getattr(c, "_host", None):
-        mv["host"] = c._host
-    ref.update({"mova": mv})
-    return mv
+def _mova_dev(ref, mv, fresh=True):
+    V = _vac()
+    try:
+        d, new_auth = V.device(ref.id, mv, fresh)
+    except V.VacError as e:
+        raise ApiError(str(e), 409 if e.status == 409 else 400) from None
+    if new_auth:
+        mv = dict(mv, auth=new_auth)
+        ref.update({"mova": mv})
+    return V, d
 
 
 def _mova_route(path, body, sess, ref):
@@ -932,10 +926,9 @@ def _mova_route(path, body, sess, ref):
         regions = [body["country"]] if body.get("country") in MOVA_REGIONS else list(MOVA_REGIONS)
         last = None
         for country in regions:
-            try:
-                c = _mova_client({"user": user, "country": country}, pw)
-            except ApiError as e:
-                last = e
+            c = _mova_login(user, pw, country)
+            if c is None:
+                last = ApiError("האימייל או הסיסמה של MOVAhome לא נכונים", 409)
                 continue
             data = c.get_devices() or {}
             recs = ((data.get("page") or {}).get("records")) or []
@@ -944,52 +937,50 @@ def _mova_route(path, body, sess, ref):
                 last = ApiError("החשבון מחובר, אבל לא נמצא בו שואב")
                 continue
             r = vac[0]
-            c._did = str(r["did"])
-            try:
-                c.get_device_info()
-            except Exception:  # noqa: BLE001
-                pass
             name = r.get("customName") or (r.get("deviceInfo") or {}).get("displayName") or "MOVA"
-            mv = _mova_save(ref, {"user": user, "country": country, "did": str(r["did"]), "model": r.get("model", ""), "name": name}, c)
+            mv = {"user": user, "country": country, "did": str(r["did"]), "model": r.get("model", ""), "name": name,
+                  "mac": r.get("mac") or "", "bind": r.get("bindDomain") or "", "auth": c.auth_key}
+            ref.update({"mova": mv})
+            _vac().forget(ref.id)
             return {"mova": {"name": name, "model": mv["model"]}}
         raise last or ApiError("לא הצלחתי להתחבר ל-MOVAhome")
     if path == "/mova/logout":
         ref.update({"mova": firestore.DELETE_FIELD})
+        try:
+            _vac().forget(ref.id)
+        except ApiError:
+            pass
         return {"done": True}
     if not mv.get("did"):
         raise ApiError("השואב לא מחובר", 404)
-    c = _mova_client(mv)
-    did = str(mv["did"])
-    if path == "/mova/state":
-        res = c.send("get_properties", [{"did": did, "siid": s, "piid": p} for s, p in MV_PROPS.values()]) or []
-        out = {}
-        for k, (s, p) in MV_PROPS.items():
-            for x in res if isinstance(res, list) else []:
-                if x.get("siid") == s and x.get("piid") == p and x.get("code", 0) == 0:
-                    out[k] = x.get("value")
-        _mova_save(ref, mv, c)
-        if not out:
-            raise ApiError("השואב לא ענה. בדוק שהוא מחובר ל-WiFi")
-        return {"state": out, "name": mv.get("name", "MOVA")}
-    if path == "/mova/act":
-        a = MV_ACTS.get(str(body.get("a")))
-        if not a:
-            raise ApiError("פעולה לא מוכרת")
-        r = c.send("action", {"did": did, "siid": a[0], "aiid": a[1], "in": []})
-        _mova_save(ref, mv, c)
-        if r is None:
-            raise ApiError("השואב לא קיבל את הפקודה")
-        return {"sent": True}
-    if path == "/mova/set":
-        k = str(body.get("k"))
-        if k not in MV_SET or body.get("v") not in MV_SET[k][1]:
-            raise ApiError("הגדרה לא מוכרת")
-        (s, p), _ = MV_SET[k]
-        r = c.send("set_properties", [{"did": did, "siid": s, "piid": p, "value": body["v"]}])
-        _mova_save(ref, mv, c)
-        if r is None:
-            raise ApiError("השואב לא קיבל את ההגדרה")
-        return {"sent": True}
+    V, d = _mova_dev(ref, mv)
+    try:
+        if path == "/mova/state":
+            out = V.snapshot(d)
+            out["name"] = mv.get("name") or out.get("name") or "MOVA"
+            return out
+        if path == "/mova/map":
+            m = V.render_map(ref.id, d)
+            if not m:
+                return {"map": None}
+            return {"map": m}
+        if path == "/mova/act":
+            V.act(d, str(body.get("a") or ""), body)
+            V._quiet(d)
+            return {"sent": True, **V.snapshot(d)}
+        if path == "/mova/set":
+            V.set_value(d, str(body.get("k") or ""), body.get("v"))
+            V._quiet(d)
+            return {"sent": True, **V.snapshot(d)}
+    except V.VacError as e:
+        raise ApiError(str(e)) from None
+    except ApiError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)
+        if not msg or not any("\u0590" <= ch <= "\u05ff" for ch in msg):
+            msg = "השואב לא קיבל את הפקודה"
+        raise ApiError(msg) from None
     raise ApiError("לא נמצא", 404)
 
 

@@ -1,0 +1,528 @@
+"""HomeOn - full MOVA / Dreame robot vacuum control through the MOVAhome cloud.
+
+Runs the open-source dreame-vacuum library (MIT, github.com/Tasshack/dreame-vacuum, vendored in ./dreame)
+the same way Home Assistant does, but on demand: one device object per HomeOn account, kept warm while the
+server instance lives, refreshed on every request. Everything the MOVAhome app shows - state, rooms and map,
+room cleaning, the base station, consumables, settings, do-not-disturb, schedules and history - is exposed
+as plain JSON for the HomeOn page.
+"""
+import base64
+import io
+import threading
+import time
+
+from dreame import DreameVacuumDevice
+from dreame.exceptions import DeviceException
+from dreame.types import (
+    DreameVacuumAction as A,
+    DreameVacuumProperty as P,
+    DreameVacuumAutoSwitchProperty as AS,
+    DreameVacuumAIProperty as AI,
+)
+
+
+class VacError(Exception):
+    def __init__(self, msg, status=400):
+        super().__init__(msg)
+        self.status = status
+
+
+# ---------- Hebrew ----------
+HE_ERRORS = {
+    "device_unavailable": "השואב לא זמין כרגע. בדוק שהוא דולק ומחובר ל-WiFi",
+    "unavailable_while_running": "אי אפשר לשנות את זה בזמן שהשואב עובד",
+    "unavailable_on_current_map": "צריך מפה שמורה כדי לנקות חדרים",
+    "unavailable_without_map": "אין עדיין מפה. צריך ניקוי מלא ראשון כדי ליצור מפה",
+    "unavailable_with_temporary_map": "יש מפה זמנית. צריך לשמור אותה קודם",
+    "unavailable_while_draining": "אי אפשר בזמן ניקוז",
+    "unavailable_while_self_wash": "אי אפשר בזמן שטיפת המגבים",
+    "unavailable_with_customized_cleaning": "אי אפשר כשמוגדר ניקוי מותאם לכל חדר",
+    "low_battery": "הסוללה חלשה מדי",
+    "start_failed": "השואב לא התחיל",
+    "invalid_value": "ערך לא תקין",
+    "invalid_option": "אפשרות לא תקינה",
+    "command_failed": "השואב לא קיבל את הפקודה",
+    "not_supported": "השואב לא תומך בזה",
+    "unavailable": "לא זמין כרגע",
+    "max_rooms_reached": "נבחרו יותר מדי חדרים",
+    "property_not_updated": "השואב לא אישר את השינוי",
+}
+DeviceException.localize = lambda key: HE_ERRORS.get(key.split(".")[1]) if key.count(".") >= 1 else None
+
+SEGMENT_HE = {
+    0: "חדר", 1: "סלון", 2: "חדר שינה", 3: "חדר עבודה", 4: "מטבח", 5: "פינת אוכל", 6: "שירותים",
+    7: "מרפסת", 8: "מסדרון", 9: "חדר שירות", 10: "ארון", 11: "חדר ישיבות", 12: "משרד",
+    13: "חדר כושר", 14: "חדר משחקים", 15: "חדר שינה נוסף",
+}
+
+# ---------- device cache ----------
+_DEVS = {}
+_LOCK = threading.Lock()
+
+
+def _quiet(d):
+    """The library schedules its own background refreshes; on a server we refresh on request instead."""
+    try:
+        d.schedule_update(-1)
+        if d._map_manager:
+            d._map_manager.schedule_update(-1)
+        if getattr(d, "_keep_alive_timer", None):
+            d._keep_alive_timer.cancel()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _close(d):
+    try:
+        d.disconnect()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def device(key, mv, fresh=True):
+    """Returns (device, new_auth_key or None)."""
+    with _LOCK:
+        e = _DEVS.get(key)
+        if e and e["did"] == str(mv.get("did")) and time.time() - e["t"] < 1800 and e["d"].available:
+            d = e["d"]
+            if fresh and time.time() - e["t"] > 2:
+                try:
+                    d.update(True)
+                except Exception:  # noqa: BLE001
+                    _close(d)
+                    e = None
+        else:
+            if e:
+                _close(e["d"])
+            e = None
+        if e is None:
+            d = DreameVacuumDevice(
+                # no local host (cloud only); the password is never stored - the saved refresh token logs in
+                mv.get("name") or "MOVA", "", "", mv.get("mac") or None,
+                mv.get("user"), "-", mv.get("country") or "eu", True, "mova", str(mv.get("did")), mv.get("auth"))
+            try:
+                d.update()
+            except Exception as ex:  # noqa: BLE001
+                _close(d)
+                if getattr(d, "auth_failed", False) or not (d._protocol.cloud and d._protocol.cloud.logged_in):
+                    raise VacError("החיבור ל-MOVAhome פג. צריך להתחבר מחדש", 409) from None
+                raise VacError(str(ex) if isinstance(ex, DeviceException) else "השואב לא ענה. בדוק שהוא מחובר ל-WiFi", 502) from None
+            e = {"d": d, "did": str(mv.get("did"))}
+            _DEVS[key] = e
+        e["t"] = time.time()
+        _quiet(d)
+        new_auth = None
+        try:
+            a = d._protocol.cloud.auth_key
+            if a and a != mv.get("auth"):
+                new_auth = a
+        except Exception:  # noqa: BLE001
+            pass
+        return d, new_auth
+
+
+def forget(key):
+    with _LOCK:
+        e = _DEVS.pop(key, None)
+        if e:
+            _close(e["d"])
+
+
+# ---------- reading ----------
+def _g(obj, name, default=None):
+    try:
+        v = getattr(obj, name)
+        return default if v is None else v
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def _iv(v):
+    try:
+        return int(v.value if hasattr(v, "value") else v)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _name(v):
+    if v is None:
+        return None
+    return str(v).lower().replace(" ", "_")
+
+
+CONSUMABLES = [  # (status attr, reset action, Hebrew)
+    ("main_brush_life", "RESET_MAIN_BRUSH", "מברשת ראשית"),
+    ("side_brush_life", "RESET_SIDE_BRUSH", "מברשת צד"),
+    ("filter_life", "RESET_FILTER", "פילטר"),
+    ("sensor_dirty_life", "RESET_SENSOR", "חיישנים"),
+    ("mop_life", "RESET_MOP_PAD", "מגבים"),
+    ("tank_filter_life", "RESET_TANK_FILTER", "פילטר מיכל המים"),
+    ("silver_ion_life", "RESET_SILVER_ION", "יוני כסף"),
+    ("detergent_life", "RESET_DETERGENT", "נוזל ניקוי"),
+    ("squeegee_life", "RESET_SQUEEGEE", "מגב הגומי"),
+    ("dirty_water_channel_dirty_life", "RESET_DIRTY_WATER_CHANNEL", "תעלת המים המלוכלכים"),
+    ("onboard_dirty_water_tank_life", "RESET_ONBOARD_DIRTY_WATER_TANK", "מיכל מים מלוכלכים בשואב"),
+    ("deodorizer_life", "RESET_DEODORIZER", "מנטרל ריחות"),
+    ("wheel_dirty_life", "RESET_WHEEL", "גלגלים"),
+    ("scale_inhibitor_life", "RESET_SCALE_INHIBITOR", "מונע אבנית"),
+    ("water_outlet_filter_dirty_life", "RESET_WATER_OUTLET_FILTER", "פילטר יציאת המים"),
+    ("washboard_cleaning_life", "RESET_WASHBOARD_CLEANING", "משטח השטיפה"),
+]
+
+# switches: key -> (property, Hebrew, hint)
+SWITCHES = [
+    ("CARPET_BOOST", P, "הגברת שאיבה על שטיחים", ""),
+    ("RESUME_CLEANING", P, "המשך ניקוי אחרי טעינה", "אם הסוללה נגמרת באמצע"),
+    ("CHILD_LOCK", P, "נעילת ילדים", "הכפתורים על השואב לא יעבדו"),
+    ("OBSTACLE_AVOIDANCE", P, "הימנעות ממכשולים", ""),
+    ("AUTO_DUST_COLLECTING", P, "ריקון אבק אוטומטי", "בכל חזרה לעמדה"),
+    ("CARPET_RECOGNITION", P, "זיהוי שטיחים", ""),
+    ("AUTO_ADD_DETERGENT", P, "הוספת נוזל ניקוי אוטומטית", ""),
+    ("AUTO_WATER_REFILLING", P, "מילוי מים אוטומטי", ""),
+    ("TIGHT_MOPPING", P, "שטיפה צפופה", ""),
+    ("CUSTOMIZED_CLEANING", P, "הגדרות נפרדות לכל חדר", ""),
+    ("MULTI_FLOOR_MAP", P, "כמה מפות (קומות)", ""),
+    ("AUTO_MOUNT_MOP", P, "הסרת מגבים אוטומטית לשאיבה", ""),
+    ("SELF_CLEAN", P, "שטיפת מגבים אוטומטית", ""),
+    ("VOICE_ASSISTANT", P, "עוזר קולי", ""),
+    ("DND_DISABLE_RESUME_CLEANING", P, "בשעות שקטות: לא להמשיך ניקוי", ""),
+    ("DND_DISABLE_AUTO_EMPTY", P, "בשעות שקטות: בלי ריקון אבק", ""),
+    ("DND_REDUCE_VOLUME", P, "בשעות שקטות: עוצמה נמוכה", ""),
+    ("OFF_PEAK_CHARGING", P, "טעינה בשעות זולות", ""),
+    ("AUTO_DRYING", AS, "ייבוש מגבים אוטומטי", ""),
+    ("COLLISION_AVOIDANCE", AS, "מניעת התנגשויות", "נוסע בעדינות ליד רהיטים"),
+    ("FLOOR_DIRECTION_CLEANING", AS, "שטיפה לאורך כיוון הפרקט", ""),
+    ("PET_FOCUSED_CLEANING", AS, "ניקוי ממוקד לחיות מחמד", ""),
+    ("INTENSIVE_CARPET_CLEANING", AS, "ניקוי שטיחים אינטנסיבי", ""),
+    ("SIDE_REACH", AS, "הגעה לפינות", ""),
+    ("MOP_EXTEND", AS, "הרחבת מגב לקצוות", ""),
+    ("GAP_CLEANING_EXTENSION", AS, "ניקוי רווחים", ""),
+    ("MOPPING_UNDER_FURNITURES", AS, "שטיפה מתחת לרהיטים", ""),
+    ("AUTO_CHARGING", AS, "טעינה חכמה", ""),
+    ("FILL_LIGHT", AS, "תאורת עזר", ""),
+    ("STAIN_AVOIDANCE", AS, "הימנעות מכתמים רטובים", ""),
+    ("AI_OBSTACLE_DETECTION", AI, "זיהוי מכשולים חכם", ""),
+    ("AI_PET_DETECTION", AI, "זיהוי חיות מחמד", ""),
+    ("AI_FURNITURE_DETECTION", AI, "זיהוי רהיטים", ""),
+    ("AI_FLUID_DETECTION", AI, "זיהוי נוזלים", ""),
+]
+SWITCH_FORMAT = {"STAIN_AVOIDANCE": lambda on: 2 if on else 1}
+SWITCH_VALUE = {"STAIN_AVOIDANCE": lambda v: v == 2, "WIDER_CORNER_COVERAGE": lambda v: v is not None and v > 0}
+
+# selects: key (status attr base) -> Hebrew
+SELECTS = [
+    ("cleaning_mode", "מצב ניקוי"),
+    ("suction_level", "עוצמת שאיבה"),
+    ("water_volume", "כמות מים"),
+    ("mop_pad_humidity", "לחות המגבים"),
+    ("cleangenius", "CleanGenius"),
+    ("cleangenius_mode", "מצב CleanGenius"),
+    ("cleaning_route", "מסלול ניקוי"),
+    ("mop_wash_level", "רמת שטיפת המגבים"),
+    ("mop_clean_frequency", "כל כמה זמן לשטוף מגבים"),
+    ("self_clean_frequency", "תדירות שטיפת מגבים"),
+    ("washing_mode", "מצב שטיפה"),
+    ("water_temperature", "טמפרטורת מים"),
+    ("auto_empty_mode", "ריקון אבק"),
+    ("carpet_sensitivity", "רגישות לשטיחים"),
+    ("carpet_cleaning", "התנהגות על שטיחים"),
+    ("mopping_type", "סוג שטיפה"),
+    ("wider_corner_coverage", "כיסוי פינות"),
+    ("mop_pad_swing", "תנועת המגב"),
+    ("mop_extend_frequency", "תדירות הרחבת המגב"),
+    ("auto_recleaning", "ניקוי חוזר אוטומטי"),
+    ("auto_rewashing", "שטיפה חוזרת אוטומטית"),
+    ("custom_mopping_route", "מסלול שטיפה"),
+    ("mop_pressure", "לחץ המגב"),
+    ("mop_temperature", "חום המגב"),
+    ("low_lying_area_frequency", "ניקוי מתחת לרהיטים נמוכים"),
+    ("scraper_frequency", "תדירות ניקוי המגרד"),
+    ("auto_lds_coverage", "כיסוי הלייזר"),
+]
+SELECT_OPTIONS_ATTR = {"auto_recleaning": "second_cleaning_list", "auto_rewashing": "second_cleaning_list"}
+
+OPT_HE = {
+    "quiet": "שקט", "standard": "רגיל", "strong": "חזק", "turbo": "טורבו", "max": "מקסימום",
+    "low": "נמוך", "medium": "בינוני", "high": "גבוה", "ultra": "מקסימלי",
+    "sweeping": "שאיבה", "mopping": "שטיפה", "sweeping_and_mopping": "שאיבה ושטיפה",
+    "mopping_after_sweeping": "שאיבה ואז שטיפה", "routine_cleaning": "ניקוי רגיל", "deep_cleaning": "ניקוי יסודי",
+    "slightly_dry": "כמעט יבש", "moist": "לח", "wet": "רטוב", "dry": "יבש",
+    "water_saving": "חיסכון במים", "daily": "יומי", "deep": "יסודי", "light": "קל",
+    "normal": "רגיל", "off": "כבוי", "on": "פעיל", "smart": "חכם", "auto": "אוטומטי", "standard_mode": "רגיל",
+    "by_area": "לפי שטח", "by_time": "לפי זמן", "by_room": "לפי חדר", "intelligent": "חכם",
+    "avoidance": "להימנע", "adaptation": "להתאים", "remove_mop": "להסיר מגבים", "ignore": "להתעלם", "cross": "לעבור",
+    "vacuum_and_mop": "שאיבה ושטיפה", "in_deep_mode": "במצב יסודי", "in_all_modes": "בכל המצבים",
+    "every_time": "כל פעם", "frequent": "לעיתים קרובות", "infrequent": "לעיתים רחוקות",
+    "normal_water": "מים רגילים", "mild": "פושר", "warm": "חמים", "hot": "חם",
+    "quick": "מהיר", "intensive": "אינטנסיבי", "s_shape": "בצורת S", "x_shape": "בצורת X",
+    "lower": "נמוך", "higher": "גבוה", "disabled": "כבוי", "enabled": "פעיל",
+}
+
+
+def _opt_he(name):
+    if name is None:
+        return None
+    k = str(name).lower().replace(" ", "_")
+    return OPT_HE.get(k) or str(name).replace("_", " ").capitalize()
+
+
+def _settings(d):
+    s = d.status
+    sw = []
+    for key, enum, he, hint in SWITCHES:
+        try:
+            prop = enum[key]
+        except KeyError:
+            continue
+        v = d.get_property(prop)
+        if v is None:
+            continue
+        on = SWITCH_VALUE.get(key, lambda x: bool(x))(v)
+        sw.append({"k": key, "t": he, "h": hint, "on": bool(on)})
+    sel = []
+    for key, he in SELECTS:
+        lst = _g(s, SELECT_OPTIONS_ATTR.get(key, key + "_list"))
+        cur = _g(s, key + "_name")
+        if not lst or cur is None or str(cur).lower() in ("unknown", "none"):
+            continue
+        opts = [{"v": n, "t": _opt_he(n)} for n in lst.keys()]
+        if len(opts) < 2:
+            continue
+        sel.append({"k": key, "t": he, "cur": _name(cur), "o": opts})
+    num = []
+    vol = d.get_property(P.VOLUME)
+    if vol is not None:
+        num.append({"k": "volume", "t": "עוצמת קול", "v": int(vol), "min": 0, "max": 100, "step": 10, "u": "%"})
+    dt = d.get_property(P.DRYING_TIME)
+    if dt is not None and _g(d.capability, "self_wash_base"):
+        num.append({"k": "drying_time", "t": "זמן ייבוש מגבים", "v": int(dt), "min": 2, "max": 4 if not _g(d.capability, "long_drying_time") else 12, "step": 1, "u": "שעות"})
+    aef = d.get_property(P.AUTO_EMPTY_FREQUENCY)
+    if aef is not None and not _g(d.capability, "auto_empty_mode"):
+        num.append({"k": "auto_empty_frequency", "t": "ריקון אבק כל", "v": int(aef), "min": 1, "max": 3, "step": 1, "u": "ניקויים"})
+    return sw, sel, num
+
+
+def _rooms(d):
+    out = []
+    segs = _g(d.status, "segments") or {}
+    for sid, seg in sorted(segs.items(), key=lambda kv: (_g(kv[1], "order") or 99, kv[0])):
+        name = _g(seg, "custom_name")
+        if not name:
+            t = _g(seg, "type", 0)
+            name = SEGMENT_HE.get(t, "חדר")
+            idx = _g(seg, "index", 0)
+            if t == 0:
+                name = f"חדר {sid}"
+            elif idx:
+                name = f"{name} {idx + 1}"
+        out.append({"id": int(sid), "name": name, "x": _g(seg, "x"), "y": _g(seg, "y"), "type": _g(seg, "type", 0)})
+    return out
+
+
+def _history(d):
+    out = []
+    for h in (_g(d.status, "_cleaning_history") or [])[:20]:
+        try:
+            out.append({"t": int(h.date.timestamp()), "min": h.cleaning_time, "m2": h.cleaned_area,
+                        "done": h.completed, "status": _iv(h.status)})
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
+def _schedules(d):
+    out = []
+    for t in (_g(d.status, "schedule") or []):
+        out.append({"id": t.id, "on": bool(t.enabled), "time": t.time, "days": t.repeats, "once": bool(t.once),
+                    "suction": t.suction_level, "water": t.water_volume})
+    return out
+
+
+def snapshot(d):
+    s = d.status
+    err = _iv(_g(s, "error"))
+    st = {
+        "state": _iv(_g(s, "state")), "state_en": _name(_g(s, "state_name")),
+        "status": _iv(_g(s, "status")), "task": _iv(_g(s, "task_status")),
+        "battery": d.get_property(P.BATTERY_LEVEL), "charging": _iv(_g(s, "charging_status")),
+        "error": err if err not in (None, 0, -1) else 0,
+        "error_en": _g(s, "error_name") if err not in (None, 0, -1) else None,
+        "warning": bool(_g(s, "has_warning", False)), "has_error": bool(_g(s, "has_error", False)),
+        "area": d.get_property(P.CLEANED_AREA), "time": d.get_property(P.CLEANING_TIME),
+        "progress": d.get_property(P.CLEANING_PROGRESS),
+        "running": bool(_g(s, "running", False)), "paused": bool(_g(s, "paused", False)),
+        "docked": bool(_g(s, "docked", False)), "returning": bool(_g(s, "returning", False)),
+        "started": bool(_g(s, "started", False)),
+        "washing": bool(_g(s, "washing", False)), "drying": bool(_g(s, "drying", False)),
+        "emptying": bool(_g(s, "auto_emptying", False)),
+        "drying_left": _g(s, "drying_left_time"),
+        "station": _iv(_g(s, "self_wash_base_status")),
+        "clean_tank": _name(_g(s, "clean_water_tank_status_name")),
+        "dirty_tank": _name(_g(s, "dirty_water_tank_status_name")),
+        "dust_bag": _name(_g(s, "dust_bag_status_name")),
+        "detergent": _name(_g(s, "detergent_status_name")),
+        "segment_cleaning": bool(_g(s, "segment_cleaning", False)),
+        "room": None,
+        "dnd": {"on": bool(_g(s, "dnd", False)), "start": _g(s, "dnd_start"), "end": _g(s, "dnd_end")} if d.get_property(P.DND_TASK) is not None or d.get_property(P.DND) is not None else None,
+        "totals": {"count": d.get_property(P.CLEANING_COUNT), "minutes": d.get_property(P.TOTAL_CLEANING_TIME),
+                   "m2": d.get_property(P.TOTAL_CLEANED_AREA), "first": d.get_property(P.FIRST_CLEANING_DATE)},
+    }
+    cr = _g(s, "current_room")
+    if cr is not None:
+        st["room"] = int(_g(cr, "id", 0)) or None
+    cons = []
+    for attr, act, he in CONSUMABLES:
+        v = _g(s, attr)
+        if v is None:
+            continue
+        cons.append({"k": attr, "t": he, "pct": int(v), "reset": act in A.__members__})
+    sw, sel, num = _settings(d)
+    caps = d.capability
+    return {
+        "state": st, "rooms": _rooms(d), "consumables": cons, "switches": sw, "selects": sel, "numbers": num,
+        "history": _history(d), "schedules": _schedules(d),
+        "can": {
+            "station": bool(_g(caps, "self_wash_base")), "empty": bool(_g(caps, "auto_empty_base")),
+            "drying": bool(_g(s, "drying_available", False) or _g(caps, "self_wash_base")),
+            "washing": bool(_g(s, "washing_available", False) or _g(caps, "self_wash_base")),
+            "map": bool(_g(s, "current_map") is not None),
+        },
+        "model": _g(d.info, "model") if d.info else None,
+        "fw": _g(d.info, "firmware_version") if d.info else None,
+        "name": d.name if hasattr(d, "name") else None,
+    }
+
+
+# ---------- map ----------
+_RENDERERS = {}
+
+
+def render_map(key, d):
+    from dreame.map import DreameVacuumMapRenderer
+    try:
+        mm = d._map_manager
+        if mm:
+            mm.set_device_running(d.status.running, d.status.docked and not d.status.started)
+            mm.update()
+    except Exception:  # noqa: BLE001
+        pass
+    md = d.get_map(0)
+    if md is None or md.empty_map:
+        return None
+    r = _RENDERERS.get(key)
+    if r is None:
+        r = DreameVacuumMapRenderer(
+            "Dreame Dark", 0,
+            ["name", "name_background", "order", "suction_level", "water_volume", "cleaning_times",
+             "cleaning_mode", "mopping_mode"],
+            _g(d.capability, "robot_type", 0), False, False, segment_names=SEGMENT_HE)
+        _RENDERERS[key] = r
+    png = r.render_map(d.get_map_for_render(md), d.status.robot_status, d.status.station_status)
+    cal = r.calibration_points
+    w = h = None
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(png))
+        w, h = im.size
+    except Exception:  # noqa: BLE001
+        pass
+    rooms = []
+    if cal and w and h:
+        p0, p1, p2 = [(c["map"]["x"], c["map"]["y"]) for c in cal[:3]]
+
+        def px(x, y):
+            return (p0[0] + x / 1000 * (p1[0] - p0[0]) + y / 1000 * (p2[0] - p0[0]),
+                    p0[1] + x / 1000 * (p1[1] - p0[1]) + y / 1000 * (p2[1] - p0[1]))
+        for rm in _rooms(d):
+            if rm["x"] is None or rm["y"] is None:
+                continue
+            X, Y = px(rm["x"], rm["y"])
+            rooms.append({"id": rm["id"], "name": rm["name"], "px": round(X / w * 100, 2), "py": round(Y / h * 100, 2)})
+    return {"png": base64.b64encode(png).decode(), "w": w, "h": h, "rooms": rooms}
+
+
+# ---------- commands ----------
+def act(d, a, body):
+    s = d.status
+    if a == "start":
+        return d.start()
+    if a == "pause":
+        return d.pause()
+    if a == "stop":
+        return d.stop()
+    if a == "dock":
+        return d.return_to_base()
+    if a == "locate":
+        return d.locate()
+    if a == "rooms":
+        ids = [int(x) for x in (body.get("rooms") or []) if str(x).lstrip("-").isdigit()]
+        if not ids:
+            raise VacError("לא נבחרו חדרים")
+        times = max(1, min(3, int(body.get("times") or 1)))
+        return d.clean_segment(ids, times)
+    if a == "wash":
+        return d.pause_washing() if _g(s, "washing") else d.start_washing()
+    if a == "dry":
+        return d.stop_drying() if _g(s, "drying") else d.start_drying()
+    if a == "empty":
+        return d.call_action(A.START_AUTO_EMPTY)
+    if a == "clear":
+        return d.clear_warning()
+    if a == "drain":
+        return d.start_draining()
+    if a.startswith("reset:"):
+        attr = a[6:]
+        for c_attr, c_act, _ in CONSUMABLES:
+            if c_attr == attr and c_act in A.__members__:
+                return d.call_action(A[c_act])
+        raise VacError("פריט לא מוכר")
+    raise VacError("פעולה לא מוכרת")
+
+
+def set_value(d, k, v):
+    for key, enum, _, _ in SWITCHES:
+        if key == k:
+            on = bool(v)
+            val = SWITCH_FORMAT.get(key, lambda x: int(x))(on)
+            setter = getattr(d, f"set_{key.lower()}", None)
+            return setter(val) if setter else d.set_property(enum[key], val)
+    for key, _ in SELECTS:
+        if key == k:
+            lst = _g(d.status, SELECT_OPTIONS_ATTR.get(key, key + "_list")) or {}
+            if v not in lst:
+                raise VacError("אפשרות לא תקינה")
+            val = lst[v]
+            val = int(val.value if hasattr(val, "value") else val)
+            setter = getattr(d, f"set_{key}", None)
+            if setter:
+                return setter(val)
+            return d.set_property(P[key.upper()] if key.upper() in P.__members__ else AS[key.upper()], val)
+    if k == "volume":
+        return d.set_volume(max(0, min(100, int(v))))
+    if k == "drying_time":
+        return d.set_drying_time(int(v))
+    if k == "auto_empty_frequency":
+        return d.set_property(P.AUTO_EMPTY_FREQUENCY, max(1, min(3, int(v))))
+    if k == "dnd":
+        on, st, en = bool(v.get("on")), str(v.get("start") or "22:00"), str(v.get("end") or "08:00")
+        if d.get_property(P.DND_TASK) is not None:
+            return d.set_dnd_tasks(on, st, en)
+        d.set_dnd(on)
+        d.set_dnd_start(st)
+        return d.set_dnd_end(en)
+    if k == "schedule_on":
+        return _schedule_toggle(d, str(v.get("id")), bool(v.get("on")))
+    if k == "schedule_delete":
+        return d.delete_scheduled_task(str(v))
+    raise VacError("הגדרה לא מוכרת")
+
+
+def _schedule_toggle(d, sid, on):
+    raw = d.get_property(P.SCHEDULE) or ""
+    tasks = []
+    for t in raw.split(";"):
+        p = t.split("-")
+        if p and p[0] == sid and len(p) > 1:
+            p[1] = "1" if on else "0"
+        tasks.append("-".join(p))
+    return d.set_property(P.SCHEDULE, ";".join(tasks))

@@ -1,7 +1,3 @@
-"""MOVAhome / Dreamehome cloud protocol, vendored for HomeOn from Tasshack/dreame-vacuum
-(custom_components/dreame_vacuum/dreame/protocol.py), MIT License, Copyright (c) 2022 Tasshack.
-Only the cloud part is used: HomeOn talks to the vacuum through the MOVA cloud, like the MOVAhome app.
-Local miIO (Xiaomi) control is not used, so python-miio is not required."""
 import logging
 import random
 import hashlib
@@ -38,94 +34,15 @@ from cryptography.x509.verification import PolicyBuilder, Store
 from OpenSSL.crypto import X509, X509Store, X509StoreContext
 try:
     from miio.miioprotocol import MiIOProtocol
-except Exception:  # not installed: local control is unused here
-    class MiIOProtocol:  # noqa: D401
+except Exception:  # HomeOn server talks to MOVA through the cloud only, no local miIO
+    class MiIOProtocol:
         def __init__(self, *a, **k):
-            raise RuntimeError("local miIO control is not available")
+            raise RuntimeError("local miIO is not available")
 from urllib.parse import urlparse, parse_qs, quote, urljoin, urlsplit
 import re
 
-
-class DeviceException(Exception):
-    def __init__(self, *args, key=None, source=None, **placeholders):
-        self.translation_key = key
-        super().__init__(*(args or ((key,) if key else ())))
-from threading import Event
-class RestartableTimer:
-    def __init__(self) -> None:
-        self._lock = Lock()
-        self._event = Event()
-        self._thread: Thread = None
-        self._deadline: float = None
-        self._function = None
-        self._args: tuple = ()
-        self._generation: int = 0
-        self._stopped: bool = False
-
-    def start(self, delay: float, function, args: tuple = None) -> None:
-        with self._lock:
-            if self._stopped:
-                return
-            self._deadline = time.monotonic() + delay
-            self._function = function
-            self._args = args or ()
-            self._generation += 1
-            if self._thread is None or not self._thread.is_alive():
-                self._thread = Thread(target=self._run, daemon=True)
-                self._thread.start()
-        self._event.set()
-
-    def cancel(self) -> None:
-        with self._lock:
-            self._deadline = None
-            self._function = None
-            self._args = ()
-            self._generation += 1
-        self._event.set()
-
-    def stop(self) -> None:
-        with self._lock:
-            self._stopped = True
-            self._deadline = None
-            self._function = None
-            self._args = ()
-            self._generation += 1
-        self._event.set()
-
-    def _run(self) -> None:
-        while True:
-            with self._lock:
-                if self._stopped:
-                    return
-                deadline = self._deadline
-                generation = self._generation
-
-            if deadline is None:
-                self._event.wait()
-                self._event.clear()
-                continue
-
-            remaining = deadline - time.monotonic()
-            if remaining > 0:
-                woken = self._event.wait(remaining)
-                self._event.clear()
-                if woken:
-                    continue
-
-            with self._lock:
-                if self._stopped or self._generation != generation or self._deadline is None:
-                    continue
-                function = self._function
-                args = self._args
-                self._deadline = None
-                self._function = None
-                self._args = ()
-
-            try:
-                function(*args)
-            except:
-                pass
-
+from .exceptions import DeviceException
+from .types import RestartableTimer
 
 DREAME_STRINGS: Final = (
     "H4sIAAAAAAAC/41U23LiOBD9FSpVQ81uLcYy4eJN8UDCMDCzCRtuAbamKCEJW4ksOZaAwNevWjYJzFN4MH36pu6jbv135XFlPJoxnDDPMBJf/XWFakGjaf9HnYNY3H3ZJOOfafPL5NWqus5xNU5wZmKVsGrgIS8sfeX/xkqymxIfjkuo5V176KY0Jliwas3z/T9s5C3WnJSW/R9i8YTEPOjtSX/xNnzpPc6TUfDYTztT1FvOZDwcdqO2DfDdzwraYLPVVkiwNiybcmrlNZe0qxLMpQVpplKWmYMVbTcDsJdTrPVeZRRSVfP+Knhr4qpyX6NeGIRiQpjWqxPM2CZjOn7H7C3lVrHiuTHiCgTDJJZm5QopUm81yyr28LwEQFBhjt4bKCwUGwyRbMcJs4Lg2swCsMuNyg3Dyd0gB8qQQkpxhhNd+DscQXSiKBOuOmLb1R8l2dMqRCXAIJP0TiUJPlW04QJC4U9a14JCiDWHFGBsj1AZEBox03WFdvOq9W/4jFqLpkBDJ2ISCgSdyvgRm3PaKo42oqSFplKch9NUcOIcq8/aeaer4nS1l0JhOs1Erhhqjeil1g1xona4AiPs5V3fW3w2qcgLvOvPTKpLZjK13dlezvJNctVFSv9zw18FpivrjNOIVWEEqo5WDjz28rv49m3yrI/bP+eD+lH29QB65dGbSF73y19N9bSc9qCne+oHz4fR63G7QY+3448LSJi7DrJr49WHNhPkA6QamJdsD9fII3clPGF2PJMU1t4P/IZfczuHrFSv13LRquo1mE/1EhuTVm2DgQemriXC9oj80ldqxb+5gmbXT2GwmIUx6Xcas2f6z9p/UJMeuaYv8e1jrddfRG1YyhuC5Q7rPtaxg3u2jsQ72nHN7QQO6EkTZbByMC7t02qXNbF738ZClFOBzUZlSbvz0B0NB92yc7TLrbbSlIFxmHPIU3aq7OBkgWX0W/KLF+DTJ1xEQUba/7Gj86UgIifiYX7r33+fNai/R5PjqH//PWzgvSOiYDG8ILFQNi6U9dOTiNw3Vu4dOK2S3eXILaGx3eiNHV4miaJcRmdOlyrJSLGb8A6ml+ZNgDBtXrN6iBsIoTVDtEX8ALFGfd0KEQlwYNWNJl6vW6TO/GbI/JAFpIVbtVoIc5e8GnP163+JjsKlZAYAAA=="
