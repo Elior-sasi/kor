@@ -22,7 +22,7 @@ echo "▶ מפעיל תזמון בגוגל..."
 gcloud services enable cloudscheduler.googleapis.com --quiet
 echo "▶ מעלה את השרת (2-4 דקות)..."
 gcloud functions deploy kor --gen2 --runtime=python312 --region=$R --source=. --entry-point=kor \
-  --trigger-http --allow-unauthenticated --memory=1Gi --timeout=120 --set-env-vars=TICK_SECRET=$T,VAPID_PEM=$V --quiet >/dev/null
+  --trigger-http --allow-unauthenticated --memory=1Gi --cpu=1 --timeout=120 --set-env-vars=TICK_SECRET=$T,VAPID_PEM=$V --quiet >/dev/null
 URL=$(gcloud functions describe kor --region=$R --format='value(url)')
 echo "▶ קובע ריצה כל דקה..."
 if gcloud scheduler jobs describe kor-tick --location=$R >/dev/null 2>&1; then
