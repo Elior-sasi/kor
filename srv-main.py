@@ -979,7 +979,7 @@ def _mova_route(path, body, sess, ref):
         return {"on": bool(body.get("on"))}
     if not mv.get("did"):
         raise ApiError("השואב לא מחובר", 404)
-    V, d = _mova_dev(ref, mv)
+    V, d = _mova_dev(ref, mv, path not in ("/mova/move", "/mova/obstacle"))
     try:
         if path == "/mova/state":
             out = V.snapshot(d)
@@ -992,9 +992,14 @@ def _mova_route(path, body, sess, ref):
                 return {"map": None}
             return {"map": m}
         if path == "/mova/act":
-            V.act(d, str(body.get("a") or ""), body)
+            V.act(d, str(body.get("a") or ""), body, ref.id)
             V._quiet(d)
             return {"sent": True, **V.snapshot(d)}
+        if path == "/mova/obstacle":
+            return {"img": V.obstacle_image(d, body.get("i"))}
+        if path == "/mova/move":
+            V.act(d, "move", body, ref.id)
+            return {"sent": True}
         if path == "/mova/edit":
             V.edit(ref.id, d, body)
             V._quiet(d)

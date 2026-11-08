@@ -53,7 +53,10 @@ HE_ERRORS = {
     "unavailable_with_temporary_map": "יש מפה זמנית. צריך לשמור אותה קודם",
     "unavailable_while_draining": "אי אפשר בזמן ניקוז",
     "unavailable_while_self_wash": "אי אפשר בזמן שטיפת המגבים",
-    "unavailable_with_customized_cleaning": "אי אפשר כשמוגדר ניקוי מותאם לכל חדר",
+    "unavailable_with_customized_cleaning": "כשיש הגדרות נפרדות לכל חדר, משנים את זה בחלון של החדר",
+    "fast_mapping_mop_installed": "קודם מסירים את המגבים",
+    "unavailable_while_fast_mapping": "אי אפשר בזמן מיפוי",
+    "cloud_required": "צריך חיבור לענן",
     "low_battery": "הסוללה חלשה מדי",
     "start_failed": "השואב לא התחיל",
     "invalid_value": "ערך לא תקין",
@@ -352,7 +355,9 @@ def _rooms(d):
                 name = f"חדר {sid}"
             elif idx:
                 name = f"{name} {idx + 1}"
-        out.append({"id": int(sid), "name": name, "x": _g(seg, "x"), "y": _g(seg, "y"), "type": _g(seg, "type", 0)})
+        out.append({"id": int(sid), "name": name, "x": _g(seg, "x"), "y": _g(seg, "y"), "type": _g(seg, "type", 0),
+                    "suction": _iv(_g(seg, "suction_level")), "water": _iv(_g(seg, "water_volume")),
+                    "times": _iv(_g(seg, "cleaning_times")), "mode": _iv(_g(seg, "cleaning_mode"))})
     return out
 
 
@@ -373,6 +378,25 @@ def _schedules(d):
         out.append({"id": t.id, "on": bool(t.enabled), "time": t.time, "days": t.repeats, "once": bool(t.once),
                     "suction": t.suction_level, "water": t.water_volume})
     return out
+
+
+def _opts(lst):
+    out = []
+    for n, v in (lst or {}).items():
+        v = _iv(v)
+        if v is None or str(n).lower() in ("unknown", "none"):
+            continue
+        out.append({"v": int(v), "t": _opt_he(n)})
+    return out
+
+
+def _room_opts(d):
+    s = d.status
+    wet = _g(d.capability, "self_wash_base")
+    return {"suction": _opts(_g(s, "suction_level_list")),
+            "water": _opts(_g(s, "mop_pad_humidity_list" if wet else "water_volume_list")),
+            "water_t": "לחות המגבים" if wet else "כמות מים",
+            "mode": _opts(_g(s, "cleaning_mode_list"))}
 
 
 def snapshot(d):
@@ -423,7 +447,14 @@ def snapshot(d):
             "drying": bool(_g(s, "drying_available", False) or _g(caps, "self_wash_base")),
             "washing": bool(_g(s, "washing_available", False) or _g(caps, "self_wash_base")),
             "map": bool(_g(s, "current_map") is not None),
+            "zone": bool(_g(caps, "map", True)),
+            "fast_map": bool(_g(caps, "lidar_navigation", True)),
+            "carpets": bool(_g(caps, "carpet_recognition", False) or _g(caps, "carpet_material", False) or _g(caps, "map", False)),
+            "obstacles": bool(_g(caps, "ai_detection", False)),
         },
+        "room_opts": _room_opts(d),
+        "custom": bool(_g(s, "customized_cleaning", False)),
+        "mapping": bool(_g(s, "fast_mapping", False)),
         "model": _g(d.info, "model") if d.info else None,
         "fw": _g(d.info, "firmware_version") if d.info else None,
         "name": d.name if hasattr(d, "name") else None,
@@ -488,6 +519,21 @@ def render_map(key, d):
         for k, attr in (("nogo", "no_go_areas"), ("nomop", "no_mopping_areas")):
             for a in (getattr(md, attr, None) or []):
                 zones[k].append(pc(a.x0, a.y0) + pc(a.x2, a.y2))
+        zones["carpets"] = [{"id": c.id, "q": pc(c.x0, c.y0) + pc(c.x2, c.y2)}
+                            for c in (getattr(md, "carpets", None) or []) if not getattr(c, "hidden", False)]
+        obs = []
+        for idx, o in (getattr(md, "obstacles", None) or {}).items():
+            try:
+                t = int(o.type.value)
+                if t in (200, 214, 216, 217, 228) or (o.x == 0 and o.y == 0):
+                    continue
+                ign = o.ignore_status.value if o.ignore_status is not None else -1
+                obs.append({"i": str(idx), "x": o.x, "y": o.y, "p": pc(o.x, o.y), "t": OBST_HE.get(t, "מכשול"),
+                            "pic": bool(o.file_name) and (o.picture_status is None or o.picture_status.value == 2),
+                            "ign": ign == 1, "can_ign": ign in (0, 1)})
+            except Exception:  # noqa: BLE001
+                pass
+        zones["obstacles"] = obs[:40]
     try:
         sel = d.status.selected_map
         for mid, m in (d.status.map_data_list or {}).items():
@@ -500,6 +546,19 @@ def render_map(key, d):
 
 
 _CAL = {}
+
+OBST_HE = {128: "בסיס של רהיט", 129: "משקל", 130: "חוט", 131: "כבל", 132: "צעצוע", 133: "נעליים", 134: "גרב",
+           135: "צואה של חיה", 136: "פח", 137: "בד", 138: "מפצל חשמל", 139: "כתם נוזל", 142: "מכשול", 158: "חיית מחמד",
+           163: "כלי ניקוי", 169: "כתם", 201: "רהיט שקל להיתקע בו", 202: "כתם שלא יורד", 204: "רגל של רהיט",
+           205: "פירורים גדולים", 206: "כתם יבש", 209: "קערת אוכל של חיה", 210: "מיטה של חיה", 215: "כתם שדולג",
+           225: "שיער", 226: "נייר", 229: "חפצים קטנים"}
+
+
+def obstacle_image(d, i):
+    img, _o = d.obstacle_image(str(i))
+    if not img:
+        raise VacError("אין תמונה למכשול הזה")
+    return base64.b64encode(img).decode()
 
 
 def _to_map(key, xp, yp):
@@ -556,11 +615,28 @@ def edit(key, d, body):
         return d.set_cleaning_sequence([int(x) for x in body.get("ids") or []])
     if op == "room_set":
         sid, k, v = int(body.get("id")), str(body.get("k")), int(body.get("v"))
+        if k == "water" and _g(d.capability, "self_wash_base"):
+            return d.set_segment_mop_pad_humidity(sid, v)
         fn = {"suction": d.set_segment_suction_level, "water": d.set_segment_water_volume,
               "times": d.set_segment_cleaning_times, "mode": d.set_segment_cleaning_mode}.get(k)
         if not fn:
             raise VacError("הגדרה לא מוכרת")
         return fn(sid, v)
+    if op == "carpets":
+        md = d.status.current_map
+        keep = {int(c.id): c for c in (getattr(md, "carpets", None) or []) if c.id is not None}
+        out = []
+        for c in body.get("carpets") or []:
+            cid = c.get("id")
+            if cid is not None and int(cid) in keep:
+                k = keep[int(cid)]
+                out.append([int(k.x0), int(k.y0), int(k.x2), int(k.y2), int(cid)])
+            else:
+                q = _seg4(key, c.get("q"))
+                out.append([min(q[0], q[2]), min(q[1], q[3]), max(q[0], q[2]), max(q[1], q[3])])
+        return d.set_carpet_area(out, [])
+    if op == "obstacle_ignore":
+        return d.set_obstacle_ignore(body.get("x"), body.get("y"), bool(body.get("on", True)))
     if op == "select_map":
         return d.set_selected_map(int(body.get("id")))
     if op == "rename_map":
@@ -569,8 +645,29 @@ def edit(key, d, body):
 
 
 # ---------- commands ----------
-def act(d, a, body):
+def act(d, a, body, key=None):
     s = d.status
+    if a == "zone":
+        zs = [_seg4(key, q) for q in (body.get("zones") or [])][:5]
+        if not zs:
+            raise VacError("לא סומן אזור")
+        zs = [[min(q[0], q[2]), min(q[1], q[3]), max(q[0], q[2]), max(q[1], q[3])] for q in zs]
+        times = max(1, min(3, int(body.get("times") or 1)))
+        return d.clean_zone(zs, times, None, None)
+    if a == "spot":
+        pts = [_to_map(key, p[0], p[1]) for p in (body.get("points") or [])][:5]
+        if not pts:
+            raise VacError("לא סומנה נקודה")
+        times = max(1, min(3, int(body.get("times") or 1)))
+        return d.clean_spot(pts, times, None, None)
+    if a == "map_new":
+        if bool(body.get("fast")):
+            return d.start_fast_mapping()
+        return d.start_mapping()
+    if a == "move":
+        r = max(-128, min(128, int(body.get("r") or 0)))
+        v = max(-300, min(300, int(body.get("v") or 0)))
+        return d.remote_control_move_step(r, v, False)
     if a == "start":
         return d.start()
     if a == "pause":
