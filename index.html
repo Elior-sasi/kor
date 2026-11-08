@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl" class="dv">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="app-version" content="9.0">
 <script>/* weekly cache clean */(function(){try{const K="kor_clean",now=Date.now(),last=+localStorage.getItem(K)||0;if(!last){localStorage.setItem(K,now);return}if(now-last<6048e5)return;localStorage.setItem(K,now);const go=()=>{const u=new URL(location.href);u.searchParams.set("v",now);location.replace(u.toString())};const p=[];if(window.caches)p.push(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))));Promise.all(p).then(go,go)}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -706,6 +706,10 @@ html.glow-warm{--g1:#2b1609;--g2:#120a05}
 html.glow-cool{--g1:#0e1d33;--g2:#070c14}
 html,html body,html.in-unplug,html.in-unplug body{background:radial-gradient(120% 65% at 50% 30%,var(--g1) 0%,var(--g2) 50%,#000 100%) fixed #000!important;transition:background .6s}
 @media (prefers-reduced-motion:reduce){html,html body{transition:none!important}}
+/* iOS zooms into any field under 16px when zoom is allowed */
+input,select,textarea{font-size:max(16px,1em)!important}
+/* a wrapped tip stays a wide rounded box, not a circle over the controls */
+.toast{border-radius:18px!important;width:max-content;max-width:calc(100% - 32px);text-align:center}
 </style>
 <link rel="stylesheet" href="/unplug/device.css?v=1">
 </head><body>
