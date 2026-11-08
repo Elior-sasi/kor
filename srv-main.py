@@ -279,7 +279,16 @@ def _tick():
         ok = False
         try:
             sess, ref = _sess_by_hash(sc["sess"])
-            if sess:
+            if sess and sc.get("device") == "mova-e30-ultra":
+                # the vacuum: start cleaning (whole home or chosen rooms) through the MOVAhome cloud
+                V, d = _mova_dev(ref, sess.get("mova") or {})
+                for c in sc.get("cmds") or []:
+                    v = c.get("value") if isinstance(c.get("value"), dict) else {}
+                    V.act(d, str(v.get("a") or "start"), v)
+                V._quiet(d)
+                ran += 1
+                ok = True
+            elif sess:
                 _send(sess, ref, sc["device"], sc["cmds"])
                 ran += 1
                 ok = True
@@ -1082,7 +1091,7 @@ def _route(req, path: str, body: dict):
             if d.get("once_at"):
                 timer = {"at": d["once_at"], "power": bool(d["cmds"][0].get("value")) if d.get("cmds") else False}
             else:
-                out.append({"id": snap.id, **{k: d.get(k) for k in ("time", "days", "label", "enabled", "cmds", "once")}})
+                out.append({"id": snap.id, **{k: d.get(k) for k in ("device", "time", "days", "label", "enabled", "cmds", "once")}})
         out.sort(key=lambda x: x["time"] or "")
         return {"schedules": out, "timer": timer, "once": True}
     if path == "/schedules/save":
