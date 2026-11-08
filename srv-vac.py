@@ -228,7 +228,6 @@ SWITCHES = [
     ("DND_DISABLE_RESUME_CLEANING", P, "בשעות שקטות: לא להמשיך ניקוי", ""),
     ("DND_DISABLE_AUTO_EMPTY", P, "בשעות שקטות: בלי ריקון אבק", ""),
     ("DND_REDUCE_VOLUME", P, "בשעות שקטות: עוצמה נמוכה", ""),
-    ("OFF_PEAK_CHARGING", P, "טעינה בשעות זולות", ""),
     ("AUTO_DRYING", AS, "ייבוש מגבים אוטומטי", ""),
     ("COLLISION_AVOIDANCE", AS, "מניעת התנגשויות", "נוסע בעדינות ליד רהיטים"),
     ("FLOOR_DIRECTION_CLEANING", AS, "שטיפה לאורך כיוון הפרקט", ""),
@@ -278,6 +277,7 @@ SELECTS = [
     ("low_lying_area_frequency", "ניקוי מתחת לרהיטים נמוכים"),
     ("scraper_frequency", "תדירות ניקוי המגרד"),
     ("auto_lds_coverage", "כיסוי הלייזר"),
+    ("voice_assistant_language", "שפת הפקודות הקוליות"),
 ]
 SELECT_OPTIONS_ATTR = {"auto_recleaning": "second_cleaning_list", "auto_rewashing": "second_cleaning_list"}
 
@@ -295,6 +295,8 @@ OPT_HE = {
     "every_time": "כל פעם", "frequent": "לעיתים קרובות", "infrequent": "לעיתים רחוקות",
     "normal_water": "מים רגילים", "mild": "פושר", "warm": "חמים", "hot": "חם",
     "quick": "מהיר", "intensive": "אינטנסיבי", "s_shape": "בצורת S", "x_shape": "בצורת X",
+    "english": "אנגלית", "german": "גרמנית", "russian": "רוסית", "italian": "איטלקית", "french": "צרפתית",
+    "korean": "קוריאנית", "chinese": "סינית", "default": "ברירת מחדל",
     "lower": "נמוך", "higher": "גבוה", "disabled": "כבוי", "enabled": "פעיל",
 }
 
@@ -424,6 +426,7 @@ def snapshot(d):
         "detergent": _name(_g(s, "detergent_status_name")),
         "segment_cleaning": bool(_g(s, "segment_cleaning", False)),
         "room": None,
+        "offpeak": {"on": bool(_g(s, "off_peak_charging")), "start": _g(s, "off_peak_charging_start"), "end": _g(s, "off_peak_charging_end")} if _g(d.capability, "off_peak_charging") else None,
         "dnd": {"on": bool(_g(s, "dnd", False)), "start": _g(s, "dnd_start"), "end": _g(s, "dnd_end")} if d.get_property(P.DND_TASK) is not None or d.get_property(P.DND) is not None else None,
         "totals": {"count": d.get_property(P.CLEANING_COUNT), "minutes": d.get_property(P.TOTAL_CLEANING_TIME),
                    "m2": d.get_property(P.TOTAL_CLEANED_AREA), "first": d.get_property(P.FIRST_CLEANING_DATE)},
@@ -448,6 +451,9 @@ def snapshot(d):
             "washing": bool(_g(s, "washing_available", False) or _g(caps, "self_wash_base")),
             "map": bool(_g(s, "current_map") is not None),
             "zone": bool(_g(caps, "map", True)),
+            "drain": bool(_g(s, "water_tank_draining_available", False)),
+            "station_clean": bool(_g(caps, "station_cleaning", False)),
+            "reclean": bool(_g(caps, "auto_recleaning", False)),
             "fast_map": bool(_g(caps, "lidar_navigation", True)),
             "carpets": bool(_g(caps, "carpet_recognition", False) or _g(caps, "carpet_material", False) or _g(caps, "map", False)),
             "obstacles": bool(_g(caps, "ai_detection", False)),
@@ -546,6 +552,23 @@ def render_map(key, d):
 
 
 _CAL = {}
+
+
+def history_png(key, d, i):
+    from dreame.map import DreameVacuumMapRenderer
+    md = d.history_map(str(int(i) + 1))
+    if md is None:
+        raise VacError("אין מפה לניקוי הזה")
+    r = _RENDERERS.get(("h", key))
+    if r is None:
+        r = DreameVacuumMapRenderer(
+            "Dreame Dark", 0,
+            ["icon", "name", "name_background", "order", "suction_level", "water_volume", "cleaning_times",
+             "cleaning_mode", "mopping_mode"],
+            _g(d.capability, "robot_type", 0), False, False, segment_names=SEGMENT_HE)
+        _RENDERERS[("h", key)] = r
+    png = r.render_map(md, d.status.robot_status, d.status.station_status)
+    return base64.b64encode(png).decode()
 
 OBST_HE = {128: "בסיס של רהיט", 129: "משקל", 130: "חוט", 131: "כבל", 132: "צעצוע", 133: "נעליים", 134: "גרב",
            135: "צואה של חיה", 136: "פח", 137: "בד", 138: "מפצל חשמל", 139: "כתם נוזל", 142: "מכשול", 158: "חיית מחמד",
@@ -660,6 +683,28 @@ def act(d, a, body, key=None):
             raise VacError("לא סומנה נקודה")
         times = max(1, min(3, int(body.get("times") or 1)))
         return d.clean_spot(pts, times, None, None)
+    if a == "preset":
+        for k in ("cleaning_mode", "suction_level"):
+            if body.get(k):
+                try:
+                    set_value(d, k, body[k])
+                except Exception:  # noqa: BLE001
+                    pass
+        ids = [int(x) for x in (body.get("rooms") or [])]
+        if ids:
+            return d.clean_segment(ids, max(1, min(3, int(body.get("times") or 1))))
+        return d.start()
+    if a == "station_clean":
+        return d.start_station_cleaning()
+    if a == "reclean":
+        try:
+            d.history_map(1)
+        except Exception:  # noqa: BLE001
+            pass
+        r = d.start_recleaning()
+        if r is None:
+            raise VacError("אין מה להשלים מהניקוי האחרון")
+        return r
     if a == "map_new":
         if bool(body.get("fast")):
             return d.start_fast_mapping()
@@ -710,6 +755,14 @@ def set_value(d, k, v):
             val = SWITCH_FORMAT.get(key, lambda x: int(x))(on)
             setter = getattr(d, f"set_{key.lower()}", None)
             return setter(val) if setter else d.set_property(enum[key], val)
+    if k == "voice_assistant_language":
+        lst = _g(d.status, "voice_assistant_language_list") or {}
+        if v not in lst:
+            raise VacError("אפשרות לא תקינה")
+        val = lst[v]
+        return d.set_voice_assistant_language(str(val.value if hasattr(val, "value") else val))
+    if k == "offpeak":
+        return d.set_off_peak_charging_config(bool(v.get("on")), str(v.get("start") or "22:00"), str(v.get("end") or "08:00"))
     for key, _ in SELECTS:
         if key == k:
             lst = _g(d.status, SELECT_OPTIONS_ATTR.get(key, key + "_list")) or {}
