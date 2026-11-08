@@ -609,8 +609,8 @@ if(!inU)return;document.documentElement.classList.add('in-unplug');
 addEventListener('DOMContentLoaded',()=>{const h=document.querySelector('header.top');if(!h)return;const b=document.createElement('button');b.className='menu-btn';b.id='unplugBack';b.setAttribute('aria-label','חזרה ל-HomeOn');
 b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};h.insertBefore(b,h.firstChild);
-/* like the other HomeOn pages: the back button and the menus sit in the corners of the first card */
-const hero=document.querySelector('.hero');if(hero)hero.prepend(h);
+/* Ember look: turbo sits between + and − under the dial */
+const cr=document.querySelector('.ctl-row'),tb=document.getElementById('turboBtn'),mi=document.getElementById('minus');if(cr&&tb&&mi)cr.insertBefore(tb,mi);
 /* swipe from the right edge (RTL back) closes it, like going back in HomeOn */
 let x0=null,y0=0;addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.clientX>innerWidth-28||t.clientX<28?t.clientX:null;y0=t.clientY},{passive:true});
 addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];if(Math.abs(t.clientX-x0)>90&&Math.abs(t.clientY-y0)<60)b.onclick();x0=null},{passive:true})})})();</script>
@@ -645,6 +645,32 @@ addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];i
 .in-unplug .bb-t b{color:#6fa8ff!important}
 .in-unplug .bb-ic{color:#6fa8ff!important}
 .in-unplug .bb-dots i.on{background:#3d8bff!important}
+
+/* ---------- Ember look inside HomeOn: cool glow, thin big numbers, controls under the dial, tiles ---------- */
+html.in-unplug,html.in-unplug body{background:radial-gradient(120% 65% at 50% 30%,#0e1d33 0%,#070c14 50%,#000 100%) fixed #000!important}
+html.in-unplug .app{background:transparent!important}
+html.in-unplug header.top{margin:0!important;min-height:60px;align-items:center}
+html.in-unplug header.top h1{font-size:2rem!important;font-weight:800!important}
+html.in-unplug header.top .menu-btn,html.in-unplug #unplugBack{width:52px!important;height:52px!important;border-radius:50%!important;background:#1c1c1ecc!important;border:0!important;color:#fff!important;display:grid!important;place-items:center}
+html.in-unplug header.top .top-r{gap:10px!important}
+html.in-unplug .hero{background:none!important;padding:0!important;border-radius:0!important;overflow:visible!important;margin:0!important}
+html.in-unplug .ac-product{display:none!important}
+html.in-unplug .temp{font-weight:200!important;letter-spacing:-.03em}
+html.in-unplug .ctl-row{display:flex!important;align-items:center;justify-content:space-between;gap:10px;margin:0!important}
+html.in-unplug .ctl-row .step{position:static!important;width:64px!important;height:64px!important;border-radius:50%!important;background:#1c1c1ecc!important;font-size:2rem!important;font-weight:500!important;flex:none}
+html.in-unplug .ctl-row .turbo{position:static!important;width:auto!important;min-height:48px!important;padding:0 18px!important;border-radius:999px!important;background:#1c1c1ecc!important;display:flex!important;flex-direction:row!important;align-items:center;gap:8px;font-size:1rem!important;font-weight:600}
+html.in-unplug .ctl-row .turbo[hidden]{display:none!important}
+html.in-unplug .ctl-row .turbo[aria-pressed="true"]{background:#3d8bff2e!important;color:#6fa8ff!important}
+html.in-unplug .power-row{display:block!important}
+html.in-unplug .power,html.in-unplug .app.is-off .power{width:100%;min-height:64px!important;border-radius:999px!important;background:#1c1c1ecc!important;color:#fff!important;font-weight:700!important;font-size:1.15rem!important}
+html.in-unplug .power[aria-pressed="true"]{background:#ff9a3d!important;color:#1f0e00!important}
+html.in-unplug .sec>h2{color:#aeaeb2!important;font-weight:600!important;font-size:1rem!important}
+html.in-unplug .profiles{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:8px!important;overflow:visible!important;margin:0!important;padding:0!important}
+html.in-unplug .prof{min-height:96px!important;border-radius:24px!important;background:#1c1c1ecc!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;text-align:center!important;padding:8px 4px!important;gap:6px!important;width:auto!important}
+html.in-unplug .prof svg{width:28px!important;height:28px!important}
+html.in-unplug .prof b{font-size:.95rem!important;font-weight:600!important;color:#fff!important}
+html.in-unplug .prof[aria-pressed="true"]{background:#3d8bff2e!important;outline:1.5px solid #3d8bff66}
+html.in-unplug .more{background:#1c1c1ecc!important}
 </style>
 </head><body>
 <div class="app" id="app">
