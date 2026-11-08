@@ -156,6 +156,9 @@ body{position:fixed;inset:0;width:100%}
 .ds-step button{width:48px;height:48px;border:0;border-radius:50%;background:var(--fill);color:var(--fg);font-size:26px}
 .ds-step input{width:100%;min-width:0;margin:0;height:44px;accent-color:var(--accent)}
 .ds-empty{padding:18px}
+
+/* no text selection on long-press, anywhere */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input,textarea,select{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 </style>
 <style>
 .pill{cursor:pointer}
