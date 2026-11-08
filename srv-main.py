@@ -1276,6 +1276,24 @@ def _route(req, path: str, body: dict):
         ref.update({"guard": {"rules": rules}, "guard_on": any(r["enabled"] for r in rules) or _home_on(sess.get("home")),
                     "guard_state": {r["id"]: old[r["id"]] for r in rules if r["id"] in old}})
         return {"saved": True, "count": len(rules)}
+    if path in ("/backup", "/backup/save"):
+        # Kept per Smart Life account (not per login), so it survives reinstall and a new QR login.
+        if sess.get("mode") == "share":
+            owner = "share:" + str(((sess.get("share") or {}).get("token_info") or {}).get("uid") or "")
+        else:
+            owner = "dev:" + str((sess.get("dev") or {}).get("access_id") or "")
+        if owner.endswith(":"):
+            raise ApiError("לא נמצא חשבון לגיבוי")
+        bref = _db().collection("homeon_backup").document(hashlib.sha256(owner.encode()).hexdigest())
+        if path == "/backup":
+            b = bref.get()
+            return {"backup": b.to_dict() if b.exists else None}
+        data = body.get("data")
+        if not isinstance(data, str) or len(data) > 900_000:
+            raise ApiError("גיבוי לא תקין")
+        now = int(time.time() * 1000)
+        bref.set({"data": data, "updatedAt": now, "device": str(body.get("device") or "")[:80]})
+        return {"saved": True, "updatedAt": now}
     if path == "/device":
         did = body.get("id") or req.args.get("id", "")
         devs = _devices(sess, ref, did)
