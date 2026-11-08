@@ -304,6 +304,20 @@ def _tick():
         else:
             snap.reference.update({"last": today + " " + (t or hm)})
     if now.minute % 2 == 0:
+        # the vacuum: tell the phone when it finished or got stuck
+        for snap in _db().collection("kor_sessions").where("mova_notify", "==", True).stream():
+            sess = snap.to_dict()
+            mv = sess.get("mova") or {}
+            if not mv.get("did"):
+                continue
+            try:
+                V, d = _mova_dev(snap.reference, mv)
+                msgs, new = V.notice(V.snapshot(d)["state"], sess.get("mova_last") or {})
+                snap.reference.update({"mova_last": new})
+                for m in msgs:
+                    _notify(snap.id, dict(m, url="./#dev=mova-e30-ultra"))
+            except Exception:  # noqa: BLE001
+                pass
         for snap in _db().collection("kor_sessions").where("track", "==", True).stream():
             sess = snap.to_dict()
             did = sess.get("device")
@@ -960,6 +974,9 @@ def _mova_route(path, body, sess, ref):
         except ApiError:
             pass
         return {"done": True}
+    if path == "/mova/notify":
+        ref.update({"mova_notify": bool(body.get("on")), "mova_last": {}})
+        return {"on": bool(body.get("on"))}
     if not mv.get("did"):
         raise ApiError("השואב לא מחובר", 404)
     V, d = _mova_dev(ref, mv)
@@ -967,6 +984,7 @@ def _mova_route(path, body, sess, ref):
         if path == "/mova/state":
             out = V.snapshot(d)
             out["name"] = mv.get("name") or out.get("name") or "MOVA"
+            out["notify"] = bool(sess.get("mova_notify"))
             return out
         if path == "/mova/map":
             m = V.render_map(ref.id, d)
