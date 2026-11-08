@@ -987,7 +987,10 @@ def _mova_route(path, body, sess, ref):
             out["notify"] = bool(sess.get("mova_notify"))
             return out
         if path == "/mova/map":
-            m = V.render_map(ref.id, d)
+            try:
+                m = V.render_map(ref.id, d)
+            except Exception as e:  # noqa: BLE001
+                raise ApiError("שגיאה בציור המפה (" + type(e).__name__ + ": " + str(e)[:120] + ")") from None
             if not m:
                 return {"map": None}
             return {"map": m}

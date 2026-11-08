@@ -525,10 +525,14 @@ def render_map(key, d):
         for k, attr in (("nogo", "no_go_areas"), ("nomop", "no_mopping_areas")):
             for a in (getattr(md, attr, None) or []):
                 zones[k].append(pc(a.x0, a.y0) + pc(a.x2, a.y2))
-        zones["carpets"] = [{"id": c.id, "q": pc(c.x0, c.y0) + pc(c.x2, c.y2)}
-                            for c in (getattr(md, "carpets", None) or []) if not getattr(c, "hidden", False)]
+        try:
+            zones["carpets"] = [{"id": c.id, "q": pc(c.x0, c.y0) + pc(c.x2, c.y2)}
+                                for c in (getattr(md, "carpets", None) or []) if not getattr(c, "hidden", False)]
+        except Exception:  # noqa: BLE001
+            zones["carpets"] = []
         obs = []
-        for idx, o in (getattr(md, "obstacles", None) or {}).items():
+        ob = getattr(md, "obstacles", None) or {}
+        for idx, o in (ob.items() if hasattr(ob, "items") else enumerate(ob)):
             try:
                 t = int(o.type.value)
                 if t in (200, 214, 216, 217, 228) or (o.x == 0 and o.y == 0):
