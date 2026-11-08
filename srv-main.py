@@ -303,6 +303,15 @@ def _tick():
                 snap.reference.update({"tries": tries})
         else:
             snap.reference.update({"last": today + " " + (t or hm)})
+    # the vacuum: keep its MOVAhome login warm, so the first tap after a long break doesn't wait for a fresh login
+    try:
+        for snap in _db().collection("kor_sessions").where("mova.did", ">", "").stream():
+            try:
+                _mova_dev(snap.reference, (snap.to_dict() or {}).get("mova") or {}, False)
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception:  # noqa: BLE001
+        pass
     if now.minute % 2 == 0:
         # the vacuum: tell the phone when it finished or got stuck
         for snap in _db().collection("kor_sessions").where("mova_notify", "==", True).stream():
@@ -979,7 +988,7 @@ def _mova_route(path, body, sess, ref):
         return {"on": bool(body.get("on"))}
     if not mv.get("did"):
         raise ApiError("השואב לא מחובר", 404)
-    V, d = _mova_dev(ref, mv, path not in ("/mova/move", "/mova/obstacle", "/mova/hmap"))
+    V, d = _mova_dev(ref, mv, path not in ("/mova/move", "/mova/obstacle", "/mova/hmap", "/mova/act", "/mova/set"))
     try:
         if path == "/mova/state":
             out = V.snapshot(d)
@@ -995,9 +1004,10 @@ def _mova_route(path, body, sess, ref):
                 return {"map": None}
             return {"map": m}
         if path == "/mova/act":
+            # send at once and answer at once; the app reads the new state a moment later
             V.act(d, str(body.get("a") or ""), body, ref.id)
             V._quiet(d)
-            return {"sent": True, **V.snapshot(d)}
+            return {"sent": True}
         if path == "/mova/hmap":
             return {"png": V.history_png(ref.id, d, int(body.get("i") or 0))}
         if path == "/mova/obstacle":
