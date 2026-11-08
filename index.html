@@ -387,32 +387,7 @@ button:active{transform:scale(.96)}
 @keyframes pend{0%,100%{opacity:.25}50%{opacity:1}}
 .app.boot .temp,.app.boot .mode-lbl{opacity:.55}
 /* light mode */
-@media (prefers-color-scheme:light){
-  :root{--bg:#f2f2f7;--fg:#000;--muted:rgba(60,60,67,.6);--line:rgba(60,60,67,.14);--off:#aeaeb2;
-    --glass:rgba(255,255,255,.72);--glass-2:rgba(255,255,255,.85);--glass-edge:rgba(0,0,0,.07);--glass-hi:rgba(255,255,255,1);color-scheme:light}
-  html,body{background:#f2f2f7}
-  body::before{background:radial-gradient(60% 45% at 50% 22%,var(--accent-soft),transparent 70%),radial-gradient(50% 40% at 85% 85%,rgba(120,120,255,.08),transparent 70%),#f2f2f7}
-  .glassy,.pick button,.pill,.menu-btn,.step,.seg,.tog,.prof,.more,.turbo,.air svg,.chip,.item,.btn,.timer-line,.choice,.field input,.field select,.stat-big>div,.hint,.icon-btn{box-shadow:inset 0 1px 0 #fff,0 1px 3px rgba(0,0,0,.06)!important}
-  .track{stroke:rgba(0,0,0,.08)}
-  .tick{stroke:rgba(0,0,0,.45)}
-  .knob{fill:#fff;filter:drop-shadow(0 1px 4px rgba(0,0,0,.25))}
-  .app.is-off .temp{color:rgba(0,0,0,.25)!important}
-  .app.is-off .mode-lbl{color:rgba(0,0,0,.35)!important}
-  .app.is-off .knob{fill:#fff}
-  .bottom-bar{background:rgba(255,255,255,.7)}
-  .bb:active{background:rgba(0,0,0,.05)!important}
-  .sheet{background:rgba(242,242,247,.85)!important}
-  .sheet::before{background:rgba(0,0,0,.2)}
-  .sheet-x{background:rgba(0,0,0,.07)}
-  .scrim{background:rgba(0,0,0,.25)}
-  .toast{background:rgba(255,255,255,.85);color:#000}
-  #toggles .tog svg{background:rgba(0,0,0,.06)}
-  .power{color:#0b1420}
-  .mode-lbl,.indoor .arr,.timer-line,.air[aria-pressed="true"],.chip[aria-pressed="true"],.pick button[aria-pressed="true"],.bb-ic,#toggles .tog[aria-pressed="true"] svg,.prof[aria-pressed="true"] svg,.prof[aria-pressed="true"] b,.turbo[aria-pressed="true"]{color:color-mix(in srgb,var(--accent) 62%,#000)!important}
-  .app.is-off .power{color:#000}
-  .btn.pri{color:#0b1420}
-  .indoor{color:#000!important}
-}
+
 .brand{direction:ltr;font-weight:700;letter-spacing:-.03em;background:linear-gradient(90deg,var(--fg) 40%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
 /* own scroller with hidden indicator */
 html,body{height:100%;overflow:hidden}
@@ -427,7 +402,7 @@ html,body{height:100%;overflow:hidden}
 .bottom-bar::after{display:none!important}
 .bb{border-radius:999px!important;padding:8px 14px!important}
 .bb:active{background:rgba(255,255,255,.1)!important}
-@media (prefers-color-scheme:light){.bottom-bar{background:rgba(255,255,255,.72)!important;border-color:rgba(0,0,0,.06)!important;box-shadow:inset 0 1px 0 #fff,0 10px 30px rgba(0,0,0,.12)!important}}
+
 /* 3.3: iOS standalone viewport ends above screen bottom - extend the bar below it */
 .bottom-bar{overflow:visible!important}
 .bottom-bar::after{content:"";position:absolute;left:0;right:0;top:100%;height:160px;background:inherit;pointer-events:none}
@@ -483,7 +458,7 @@ html,body{height:100%;overflow:hidden}
 .wi.on{color:var(--fg);font-size:28px;font-weight:500}
 .wi{scroll-snap-stop:normal}
 .wsfx{font-size:15px;color:var(--muted);width:34px;z-index:1}
-@media (prefers-color-scheme:light){.wsel{background:rgba(0,0,0,.06)}}
+
 /* 4.9 */
 .step{bottom:4%!important}
 .step.minus{left:0!important}.step.plus{right:0!important}
@@ -499,7 +474,7 @@ html,body{height:100%;overflow:hidden}
 .app.is-off .bb-dots i.on{background:var(--muted)}
 /* 6.0 calm: solid fills, glass only on floating layers */
 :root{--fill:#1c1c1e;--fill-2:#2c2c2e}
-@media (prefers-color-scheme:light){:root{--fill:#fff;--fill-2:#e9e9ee}}
+
 .glassy,.pick button,.menu-btn,.step,.seg,.tog,.prof,.more,.turbo,.chip,.item,.btn,.timer-line,.choice,.field input,.field select,.stat-big>div,.hint,.icon-btn{
   background:var(--fill)!important;border:0!important;box-shadow:none!important}
 #toggles{background:var(--fill-2)!important;border:0!important;box-shadow:none!important}
@@ -713,7 +688,7 @@ input,select,textarea{font-size:max(16px,1em)!important}
 /* device settings live in the ⋯ menu; only ⋯ and back stay in the corners, clear of the dial */
 #deviceSettingsBtn{display:none!important}
 </style>
-<link rel="stylesheet" href="/unplug/device.css?v=2">
+<link rel="stylesheet" href="/unplug/device.css?v=3">
 </head><body>
 <div class="app" id="app">
   <header class="top">
