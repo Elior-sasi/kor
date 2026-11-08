@@ -671,6 +671,11 @@ html.in-unplug .prof svg{width:28px!important;height:28px!important}
 html.in-unplug .prof b{font-size:.95rem!important;font-weight:600!important;color:#fff!important}
 html.in-unplug .prof[aria-pressed="true"]{background:#3d8bff2e!important;outline:1.5px solid #3d8bff66}
 html.in-unplug .more{background:#1c1c1ecc!important}
+
+/* when the text is big: compact steps instead of scrolling */
+html.in-unplug.fc1 .prof{min-height:72px!important}html.in-unplug.fc1 .prof svg{width:22px!important;height:22px!important}html.in-unplug.fc1 .sec>h2{display:none!important}
+html.in-unplug.fc2 header.top{min-height:48px!important}html.in-unplug.fc2 .ctl-row .step{width:52px!important;height:52px!important}html.in-unplug.fc2 .power{min-height:52px!important}
+html.in-unplug.fc3 .indoor{display:none!important}html.in-unplug.fc3 .prof{min-height:60px!important;flex-direction:row!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -1612,9 +1617,12 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
     app.style.setProperty('padding-bottom',Math.ceil(innerHeight-bar.getBoundingClientRect().top+16)+'px','important');
     /* the biggest dial that still keeps the whole page on one screen; scroll only when "more settings" is open */
     /* with "more settings" open the page scrolls anyway: keep the dial as it is, so it doesn't jump */
+    const R=document.documentElement,over=()=>app.scrollHeight>app.clientHeight+1;['fc1','fc2','fc3'].forEach(c=>R.classList.remove(c));
     if(!more.open){let w=Math.max(170,Math.min(dial.parentElement.clientWidth-96,300));
       dial.style.setProperty('width',w+'px','important');
-      while(w>200&&app.scrollHeight>app.clientHeight+1){w-=10;dial.style.setProperty('width',w+'px','important')}}
+      while(w>180&&over()){w-=10;dial.style.setProperty('width',w+'px','important')}
+      for(const c of ['fc1','fc2','fc3']){if(!over())break;R.classList.add(c)}
+      while(w>120&&over()){w-=10;dial.style.setProperty('width',w+'px','important')}}
     app.style.setProperty('overflow-y',app.scrollHeight>app.clientHeight+1?'auto':'hidden','important');
   };
   window.__fitDial=fit;setInterval(()=>{if(document.visibilityState==='visible'&&!document.querySelector('.scrim'))fit()},1200);
