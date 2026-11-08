@@ -450,7 +450,7 @@ def render_map(key, d):
     if r is None:
         r = DreameVacuumMapRenderer(
             "Dreame Dark", 0,
-            ["name", "name_background", "order", "suction_level", "water_volume", "cleaning_times",
+            ["icon", "name", "name_background", "order", "suction_level", "water_volume", "cleaning_times",
              "cleaning_mode", "mopping_mode", "no_go", "no_mop", "virtual_wall"],
             _g(d.capability, "robot_type", 0), False, False, segment_names=SEGMENT_HE)
         _RENDERERS[key] = r
