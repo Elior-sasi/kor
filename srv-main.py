@@ -1322,6 +1322,32 @@ def _route(req, path: str, body: dict):
         now = int(time.time() * 1000)
         bref.set({"data": data, "updatedAt": now, "device": str(body.get("device") or "")[:80]})
         return {"saved": True, "updatedAt": now}
+    if path == "/local":
+        # for HomeOn on the iPhone: each device's local key and data-point map, so it can talk to it on the home WiFi
+        if sess.get("mode") != "share":
+            return {"devices": []}
+        api = _share_api(sess, ref)
+        items = []
+        for home in _share_ok(api.get("/v1.0/m/life/users/homes")) or []:
+            items += _share_ok(api.get("/v1.0/m/life/ha/home/devices", {"homeId": str(home["ownerId"])})) or []
+
+        def rel(it):
+            try:
+                r = _share_ok(api.get(f"/v1.0/m/life/devices/{it['id']}/status")) or {}
+            except Exception:  # noqa: BLE001
+                return it, None
+            m = {}
+            for x in r.get("dpStatusRelationDTOS") or []:
+                if x.get("statusCode") and x.get("dpId") is not None:
+                    m[x["statusCode"]] = {"id": x["dpId"], "conv": x.get("valueConvert") or "default", "local": bool(x.get("supportLocal", True))}
+            return it, m
+        from concurrent.futures import ThreadPoolExecutor
+        out = []
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for it, m in ex.map(rel, [i for i in items if i.get("local_key") and not i.get("sub")]):
+                if m:
+                    out.append({"id": it["id"], "key": it["local_key"], "name": it.get("name", ""), "dps": m})
+        return {"devices": out}
     if path == "/device":
         did = body.get("id") or req.args.get("id", "")
         devs = _devices(sess, ref, did)

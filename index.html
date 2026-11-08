@@ -915,6 +915,8 @@ function timerCommand(hours){ // hours=0 cancels
 
 /* ---------- api ---------- */
 async function api(path,body){
+  /* inside HomeOn on the iPhone: on the home WiFi, talk to the device directly */
+  if(path==='/command'){try{const L=window.parent!==window&&window.parent.HOLOCAL;if(L&&await L.send(body.id,body.commands))return {ok:true,sent:true,local:true}}catch(e){}}
   const r=await fetch(CFG.api.replace(/\/$/,'')+path,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},CFG.key?{'X-Kor-Key':CFG.key}:{}),body:JSON.stringify(body||{})});
   let j;try{j=await r.json()}catch(e){throw new Error('השרת לא ענה ('+r.status+')')}
   if(r.status===401){LSset('kor_why',JSON.stringify({at:Date.now(),path,err:j.error||''}));logout(true);setTimeout(()=>{if(!linked)openConnect()},300);throw new Error(j.error||'החיבור פג')}
