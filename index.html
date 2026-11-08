@@ -606,6 +606,8 @@ if(!inU)return;document.documentElement.classList.add('in-unplug');
 addEventListener('DOMContentLoaded',()=>{const h=document.querySelector('header.top');if(!h)return;const b=document.createElement('button');b.className='menu-btn';b.id='unplugBack';b.setAttribute('aria-label','חזרה ל-HomeOn');
 b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 b.onclick=()=>{try{parent.postMessage('unplug-close','*')}catch(e){}};h.insertBefore(b,h.firstChild);
+/* like the other HomeOn pages: the back button and the menus sit in the corners of the first card */
+const hero=document.querySelector('.hero');if(hero)hero.prepend(h);
 /* swipe from the right edge (RTL back) closes it, like going back in HomeOn */
 let x0=null,y0=0;addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.clientX>innerWidth-28||t.clientX<28?t.clientX:null;y0=t.clientY},{passive:true});
 addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];if(Math.abs(t.clientX-x0)>90&&Math.abs(t.clientY-y0)<60)b.onclick();x0=null},{passive:true})})})();</script>
@@ -619,6 +621,11 @@ addEventListener('touchend',e=>{if(x0==null)return;const t=e.changedTouches[0];i
 .in-unplug header.top{gap:10px}.in-unplug header.top>div:nth-child(2){flex:1;min-width:0}
 .in-unplug #unplugBack{flex:none!important;width:44px!important;height:44px!important;border-radius:50%!important;background:#2c2c2e!important;color:#fff!important;display:grid!important;place-items:center}
 .in-unplug #unplugBack svg{width:22px;height:22px}
+.in-unplug .hero>header.top{position:absolute;top:8px;left:8px;right:8px;z-index:4;display:flex;align-items:center;gap:6px;margin:0;padding:0;pointer-events:none;flex-wrap:nowrap}
+.in-unplug .hero>header.top button{pointer-events:auto}
+.in-unplug .hero>header.top>div:nth-child(2){position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;flex:none!important}
+.in-unplug .hero>header.top .top-r{margin-inline-start:auto;display:flex;gap:6px}
+.in-unplug .hero>header.top .menu-btn{width:44px!important;height:44px!important;border-radius:50%!important;background:#2c2c2e!important;border:0!important;color:#fff!important;display:grid!important;place-items:center}
 /* HomeOn two-tone: blue when on */
 .power[aria-pressed="true"]{background:#3d8bff!important;color:#fff!important}
 .in-unplug .tog[aria-pressed="true"]::after{background-color:#3d8bff!important}
