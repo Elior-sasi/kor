@@ -520,7 +520,7 @@ def render_map(key, d):
         def pc(x, y):
             X, Y = px(x, y)
             return [round(X / w * 100, 2), round(Y / h * 100, 2)]
-        for wl in (getattr(md, "walls", None) or []):
+        for wl in (getattr(md, "virtual_walls", None) or []):
             zones["walls"].append(pc(wl.x0, wl.y0) + pc(wl.x1, wl.y1))
         for k, attr in (("nogo", "no_go_areas"), ("nomop", "no_mopping_areas")):
             for a in (getattr(md, attr, None) or []):
