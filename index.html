@@ -971,7 +971,8 @@ function send(patch,immediate){
   const prev=Object.assign({},S);Object.assign(S,patch);render();
   if(!CAP){saveDemo();return}
   Object.assign(queue,patch);clearTimeout(qT);
-  qT=setTimeout(flush,immediate?0:450);
+  /* buttons go out at once; only the temperature waits a moment, so a swipe across the dial sends one command */
+  qT=setTimeout(flush,immediate||!('temp' in patch)?0:300);
   function flush(){const p=queue;queue={};const cmds=toCommands(p);if(!cmds.length)return;
     sending++;$('app').classList.add('busy');
     PENDING=1;$('app').classList.add('pending');

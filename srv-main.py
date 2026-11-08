@@ -89,6 +89,9 @@ def _share_ok(resp):
     return resp.get("result")
 
 
+_SPEC: dict = {}
+
+
 def _share_devices(api: CustomerApi, only_id: str | None = None):
     out = []
     if only_id:
@@ -97,8 +100,23 @@ def _share_devices(api: CustomerApi, only_id: str | None = None):
         items = []
         for home in _share_ok(api.get("/v1.0/m/life/users/homes")) or []:
             items += _share_ok(api.get("/v1.0/m/life/ha/home/devices", {"homeId": str(home["ownerId"])})) or []
+    # a device's specification never changes: fetch it once (in parallel) and keep it in memory
+    now = time.time()
+    need = [it["id"] for it in items if now - _SPEC.get(it["id"], (0, None))[0] > 6 * 3600]
+    if need:
+        from concurrent.futures import ThreadPoolExecutor
+
+        def one(did):
+            try:
+                return did, _share_ok(api.get(f"/v1.1/m/life/{did}/specifications")) or {}
+            except Exception:  # noqa: BLE001
+                return did, None
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for did, sp in ex.map(one, need):
+                if sp is not None:
+                    _SPEC[did] = (now, sp)
     for it in items:
-        spec = _share_ok(api.get(f"/v1.1/m/life/{it['id']}/specifications")) or {}
+        spec = (_SPEC.get(it["id"]) or (0, {}))[1] or {}
         out.append({
             "id": it["id"], "name": it.get("name", ""), "category": it.get("category", ""),
             "online": bool(it.get("online", True)),
