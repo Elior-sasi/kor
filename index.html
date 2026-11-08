@@ -698,6 +698,7 @@ html.in-unplug header.top button{pointer-events:auto}
 html.in-unplug header.top h1{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}
 
 html.in-unplug #dial{margin-top:20px!important}
+#sdays.dayc{display:flex;flex-wrap:wrap;gap:6px}#sdays.dayc .chip{width:48px;height:48px;min-height:48px;flex:0 0 48px;border-radius:50%;padding:0;display:grid;place-items:center;font-weight:700}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -1450,7 +1451,7 @@ async function openSchedules(){
 function schedCount(){const g=new Set();SCHED.forEach(x=>{if(!x.enabled)return;const m=(x.label||'').match(/\s#r:(\w+)$/);g.add(m?'r'+m[1]:'i'+x.id)});return g.size}
 function loadExtrasLight(){const n=schedCount();EXTRA.sched=n?n+' פעילים':'אין'}
 function openSchedEdit(row){
-  const st={kind:'on',time:'18:00',end:'23:00',mode:S.mode,temp:S.temp||24,days:[0,1,2,3,4,5,6],en:true};
+  const st={kind:'on',time:'18:00',end:'23:00',mode:S.mode,temp:S.temp||24,days:[],en:true};
   const isOn=x=>(x.cmds||[]).some(c=>CAP&&c.code===CAP.power&&c.value===true)||(!(x.cmds||[]).length&&!/^כבה/.test(x.label||''));
   let oldOn=null,oldOff=null;
   if(row){const it=row.items;oldOn=it.find(isOn)||null;oldOff=it.find(x=>x!==oldOn)||null;st.en=!!row.en;
@@ -1465,7 +1466,7 @@ function openSchedEdit(row){
       <div class="trow2${st.kind==='off'?' dis':''}" id="rOn"><button class="sw" id="swOn" aria-pressed="${st.kind!=='off'}" aria-label="הדלקה"></button><label for="stime">הדלקה</label><input type="time" id="stime" value="${st.time}"></div>
       <div class="trow2${st.kind==='on'?' dis':''}" id="rOff"><button class="sw" id="swOff" aria-pressed="${st.kind!=='on'}" aria-label="כיבוי"></button><label for="send">כיבוי</label><input type="time" id="send" value="${st.kind==='off'?st.time:st.end}"></div>
     </div>
-    <div class="field"><label>ימים</label><div class="chips one" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="${st.days.includes(i)}">${d}</button>`).join('')}</div></div>
+    <div class="field"><label>ימים <small style="font-weight:400;opacity:.75">(בלי ימים: פעם אחת)</small></label><div class="chips one dayc" id="sdays">${DAY_HE.map((d,i)=>`<button class="chip" data-d="${i}" aria-pressed="${st.days.includes(i)}">${d}</button>`).join('')}</div></div>
     <div id="sOnOpts" style="visibility:${st.kind==='off'?'hidden':'visible'};display:flex;flex-direction:column;gap:14px">
       <div class="field"><label>מצב</label><div class="chips one" id="smode">${modes.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${m.id===st.mode}">${m.name}</button>`).join('')}</div></div>
       <div class="tstep"><label>טמפרטורה</label><div class="ctl"><button id="stp" aria-label="יותר">+</button><b id="stv">${st.temp}°</b><button id="stm" aria-label="פחות">−</button></div></div>
@@ -1488,7 +1489,9 @@ function openSchedEdit(row){
     q('#ss').onclick=async()=>{
       let time=q('#stime').value,end=q('#send').value;if(st.kind==='off')time=end;
       const days=[...el.querySelectorAll('#sdays .chip[aria-pressed="true"]')].map(b=>+b.dataset.d);
-      if(!time||!days.length){q('#serr').textContent='בחר שעה ולפחות יום אחד';return}
+      if(!time){q('#serr').textContent='בחר שעה';return}
+      /* no days = one time: today, or tomorrow if that hour already passed */
+      let once=false;if(!days.length){once=true;const [h,m]=time.split(':').map(Number),at=new Date();at.setHours(h,m,0,0);if(at<=new Date())at.setDate(at.getDate()+1);days.push(at.getDay())}
       if(st.kind==='range'&&(!end||end===time)){q('#serr').textContent='שעת הכיבוי צריכה להיות שונה משעת ההדלקה';return}
       const on={power:true,mode:st.mode,temp:st.temp};
       const b=q('#ss');b.disabled=true;b.textContent='שומר...';
@@ -1499,7 +1502,7 @@ function openSchedEdit(row){
         else{list.push({time,days,cmds:toCommands(on),label:actionLabel(on)+' #r:'+g,old:oldOn});
           list.push({time:end,days:end<time?days.map(d=>(d+1)%7):days,cmds:toCommands({power:false}),label:'כבה #r:'+g,old:oldOff})}
         const used=new Set();
-        for(const x of list){const o=x.old;delete x.old;const body={device:DEV.id,enabled:en,...x};if(o){body.id=o.id;used.add(o.id)}await api('/schedules/save',body)}
+        for(const x of list){const o=x.old;delete x.old;const body={device:DEV.id,enabled:en,...x,once};if(o){body.id=o.id;used.add(o.id)}await api('/schedules/save',body)}
         for(const o of [oldOn,oldOff])if(o&&!used.has(o.id))await api('/schedules/delete',{id:o.id});
         toast('התזמון נשמר');openSchedules()}
       catch(err){q('#serr').textContent=netMsg(err);b.disabled=false;b.textContent='שמור'}
