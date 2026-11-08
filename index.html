@@ -676,6 +676,17 @@ html.in-unplug .more{background:#1c1c1ecc!important}
 html.in-unplug.fc1 .prof{min-height:72px!important}html.in-unplug.fc1 .prof svg{width:22px!important;height:22px!important}html.in-unplug.fc1 .sec>h2{display:none!important}
 html.in-unplug.fc2 header.top{min-height:48px!important}html.in-unplug.fc2 .ctl-row .step{width:52px!important;height:52px!important}html.in-unplug.fc2 .power{min-height:52px!important}
 html.in-unplug.fc3 .indoor{display:none!important}html.in-unplug.fc3 .prof{min-height:60px!important;flex-direction:row!important}
+
+/* ---------- one grid for every device page: same header, dial size, rows and bar ---------- */
+html.in-unplug .app{gap:12px!important;padding-top:calc(env(safe-area-inset-top,0px) + 12px)!important}
+html.in-unplug #dial{margin:0 auto -6%!important}
+html.in-unplug .power{margin:0!important}
+html.in-unplug .prof{min-height:96px!important}
+html.in-unplug .sec>h2{margin:0 4px 8px!important;font-size:1rem!important;line-height:20px}
+html.in-unplug .more summary{min-height:58px}
+html.in-unplug .bottom-bar{padding:6px!important}html.in-unplug .bottom-bar .bb{min-height:60px!important}
+html.in-unplug .more summary{min-height:56px!important}
+html.in-unplug .prof{min-height:0!important;height:96px!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -1618,9 +1629,9 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
     /* the biggest dial that still keeps the whole page on one screen; scroll only when "more settings" is open */
     /* with "more settings" open the page scrolls anyway: keep the dial as it is, so it doesn't jump */
     const R=document.documentElement,over=()=>app.scrollHeight>app.clientHeight+1;['fc1','fc2','fc3'].forEach(c=>R.classList.remove(c));
-    if(!more.open){let w=Math.max(170,Math.min(dial.parentElement.clientWidth-96,300));
+    if(!more.open){let w=Math.max(150,Math.min(dial.parentElement.clientWidth-60,250));
       dial.style.setProperty('width',w+'px','important');
-      while(w>180&&over()){w-=10;dial.style.setProperty('width',w+'px','important')}
+      while(w>150&&over()){w-=10;dial.style.setProperty('width',w+'px','important')}
       for(const c of ['fc1','fc2','fc3']){if(!over())break;R.classList.add(c)}
       while(w>120&&over()){w-=10;dial.style.setProperty('width',w+'px','important')}}
     app.style.setProperty('overflow-y',app.scrollHeight>app.clientHeight+1?'auto':'hidden','important');
