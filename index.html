@@ -691,6 +691,11 @@ html.in-unplug .prof svg{width:28px!important;height:28px!important}html.in-unpl
 html.in-unplug.fc3 .app{gap:8px!important}
 html.in-unplug.fc2 #unplugBack,html.in-unplug.fc2 header.top .menu-btn{width:44px!important;height:44px!important}html.in-unplug.fc2 .power{min-height:52px!important;height:52px!important}html.in-unplug.fc3 .more summary{min-height:48px!important;padding-block:0!important}html.in-unplug.fc3 .bottom-bar .bb{min-height:46px!important}
 html.in-unplug.fc2 .app .power,html.in-unplug.fc2 .app.is-off .power{min-height:52px!important;height:52px!important}html.in-unplug.fc3 .more summary{min-height:50px!important}
+
+/* no title row: back and the menus float in the top corners */
+html.in-unplug header.top{position:absolute!important;top:calc(env(safe-area-inset-top,0px) + 12px);left:16px;right:16px;z-index:4;pointer-events:none;min-height:0!important}
+html.in-unplug header.top button{pointer-events:auto}
+html.in-unplug header.top h1{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}
 </style>
 </head><body>
 <div class="app" id="app">
@@ -1633,7 +1638,7 @@ setInterval(()=>{if(CAP)return;if(S.power&&S.mode!=='fan'&&S.indoor!==S.temp){S.
     /* the biggest dial that still keeps the whole page on one screen; scroll only when "more settings" is open */
     /* with "more settings" open the page scrolls anyway: keep the dial as it is, so it doesn't jump */
     const R=document.documentElement,over=()=>app.scrollHeight>app.clientHeight+1;['fc1','fc2','fc3'].forEach(c=>R.classList.remove(c));
-    if(!more.open){const w=Math.round(Math.min(260,innerWidth-80,innerHeight*.3));dial.style.setProperty('width',w+'px','important');
+    if(!more.open){const w=Math.round(Math.min(290,innerWidth-70,innerHeight*.36));dial.style.setProperty('width',w+'px','important');
       for(const c of ['fc1','fc2','fc3']){if(!over())break;R.classList.add(c)}}
     app.style.setProperty('overflow-y',app.scrollHeight>app.clientHeight+1?'auto':'hidden','important');
   };
