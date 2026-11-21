@@ -688,7 +688,7 @@ input,select,textarea{font-size:max(16px,1em)!important}
 /* device settings live in the ⋯ menu; only ⋯ and back stay in the corners, clear of the dial */
 #deviceSettingsBtn{display:none!important}
 </style>
-<link rel="stylesheet" href="/unplug/device.css?v=3">
+<link rel="stylesheet" href="/unplug/device.css?v=4">
 </head><body>
 <div class="app" id="app">
   <header class="top">
@@ -937,8 +937,9 @@ const ymd=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'});
 const hrs=m=>{m=Math.round(m||0);const h=Math.floor(m/60);return h?`${h}:${String(m%60).padStart(2,'0')} ש׳`:`${m} דק׳`};
 let pollT;
 async function refresh(){
-  if(!linked||!DEV||sending||dragging)return;
-  try{const j=await api('/device',{id:DEV.id});if(j.device){DEV.online=j.device.online;DEV.status=Object.assign(DEV.status||{},j.device.status||{});readStatus(j.device.status||{});if(LASTCMD&&Date.now()-LASTCMD.at<8000)Object.assign(S,LASTCMD.patch);connState=DEV.online?'on':'offline';cacheDev();
+  if(!linked||!DEV||sending||dragging||Object.keys(queue).length)return;
+  try{const j=await api('/device',{id:DEV.id});if(sending||dragging)return; /* a tap during the request wins over the report */
+    if(j.device){DEV.online=j.device.online;DEV.status=Object.assign(DEV.status||{},j.device.status||{});readStatus(j.device.status||{});if(LASTCMD&&Date.now()-LASTCMD.at<8000)Object.assign(S,LASTCMD.patch);Object.assign(S,queue); /* taps not sent yet are never undone by a status report */connState=DEV.online?'on':'offline';cacheDev();
     if(PENDING&&Date.now()>PENDING){PENDING=0;$('app').classList.remove('pending')}render()}}
   catch(e){connState='err';lastErr=netMsg(e);renderConn()}
 }
@@ -1407,8 +1408,8 @@ function openFanPick(){const fans=curFans();if(!fans.length)return toast('אין
 swipeable($('bbMode'),()=>curModes().map(m=>m.id),()=>S.mode,id=>send({mode:id,power:true},true),openModePick);
 swipeable($('bbFan'),()=>curFans().map(f=>String(f.raw)),()=>String(S.fan),raw=>send({fan:raw},true),openFanPick);
 $('timerLine').onclick=openTimer;$('dialTimer').onclick=e=>{e.stopPropagation();openTimer()};
-try{if(localStorage.getItem('kor_more')==='1')$('moreDet').open=true}catch(e){}
-$('moreDet').addEventListener('toggle',()=>{try{localStorage.setItem('kor_more',$('moreDet').open?'1':'0')}catch(e){}});
+/* 'more settings' always starts closed: reopening the page with it open pushed its row under the bottom bar */
+try{localStorage.removeItem('kor_more')}catch(e){}
 
 async function openSchedules(){
   const RX=/\s#r:(\w+)$/;
